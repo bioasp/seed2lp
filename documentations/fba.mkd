@@ -1,0 +1,170 @@
+# FBA
+
+## Objective reaction
+</br>
+
+> ⚠️ **Warning:**
+> 
+> The objective reaction is **not used for the seed searching**, with some [exceptions](#description). It is mainly needed to **calculate and ensure the flux**.
+
+
+### <ins>Objective given by user</ins>
+The objective reaction can be given by the user by using the option `--objective` or `-o` and the name of the reaction prefixed with **"R_"**. The tool will first check if the reaction exists in the source file, then apply this reaction as objective reaction for the flux calculation. If the 
+
+
+> 📃 **Examples:**
+>
+><table>
+>   <tr>
+>   <th style=" text-align:center" > OK </th>
+>   <th style="text-align:center"> ERROR </th>
+>   </tr>
+>   <tr>
+>   <td>
+>
+>  💻 **Command:**
+>
+> ```
+> seed2lp fba [source_file_path] [output_directory_path] -o R_R2
+> ```
+>
+> 📝 **Notes:**
+> "R_R2" is an existing reaction and will replace the objective reaction written into the source file.
+>
+>
+> 📃 **Output example:**
+>
+>```
+> Objective set:
+>     Objective reaction from command line
+> 
+> Objective : R_R2
+>```
+>
+>   </td>
+>   <td>
+>
+>  💻 **Commands:**
+>
+> ```
+>  seed2lp fba [source_file_path] [output_directory_path] -o R2
+> ``` 
+>
+> ```
+>  seed2lp fba [source_file_path] [output_directory_path] -o oops
+> ``` 
+>
+> 📃 **Output example:**
+>```
+> ERROR:
+> R2 does not exist in network file networks/toys/sbml/toy_accumulation.sbml
+>```
+>```
+> ERROR:
+> oops does not exist in network file networks/toys/sbml/toy_accumulation.sbml
+>```
+>
+>   </td>
+>   </tr>
+></table>
+
+
+
+### <ins>Objective found into source file</ins>
+When no argument is used for the objective reaction, the tool will find from the objective list of source file the objective. The description of this automatic objective search is described in 📜[Network analyse](documentations/network_analyse.mkd#Objective-Reaction)
+
+
+
+
+## Seed searching
+
+After analysing and converting the network a seed resoltuion is performed. Please read the 📜[network analyse document](documentations/network_analyse.mkd) to understand the technical terms
+
+### <ins>Description</ins>
+
+The FBA mode aims to **search randomly** sets of seeds by **ensuring flux** on the objective reaction (found or given). Thus **all metabolites** can potentially be seeds, **except**:
+- Transported⭐ metabolites are not defined as possible seeds to reduce combinatorics and avoid very similar solutions.
+- Metabolites that are never consumed as written in the source file. Indeed, the [flux rules](flux.mkd#flux-calculation-rules) creates an **import/export reaction** for seeds, and the programm can **by-pass the accumulation🔆** by adding these type of metabolites as seeds and using the **export reaction**. 
+
+
+> 💬 **Comments:**
+>
+> ⭐ A transported metabolite is a metabolite that is **transferred from one compartment to another**. The formula is therefore generally something like: $\quad$ $\quad$ M_A_e ⟷ M_A_c  ⟷ M_A_m
+>
+> Because it the same metabolites on different compartment, the program tags **M_A_c and M_A_m as transported** metabolite, therefore **only M_A_e is selected** as seed.
+>
+> This restriction allows to **avoid similar set of seeds** such as {M_A_e, M_B} or {M_A_c, M_B} or {M_A_m, M_B}
+>
+> 🔆 Some source files can create **reaction without using the product of this reaction in another reaction**, even export reactions. This is an accumulation **already existing** in the source file.
+
+> ⚠️ **Warning:**
+> 
+> However, as the main solution may result in **an accumulation**, one or more **seeds can be added** to the set in order to **use the export reaction** generated during the calculations and therefor avoid accumulation.
+>
+> If the program does that, these specific seeds are written in red into the terminal and written into the output file.
+>
+>  📃 **Output example:**
+>
+> ![](pictures/FBA/fba_avoid_accumulation_seed.png)
+
+
+--- 
+### <ins>Application with options</ins>
+We will discuss here some options, it is possible to consult [all options](options.mkd#fba).
+
+
+ 
+
+<ins> **Target as seeds:** </ins> $\quad$ `--targets-as-seeds` $\quad$`-tas`
+
+In FBA mode, the main purpose is to **ensure flux into objective reaction**. To do that, we need to be able to **produce the reactants** of the objective reaction. But **one solution** of the set of seed could be **all reactants of the objective reaction**. This is not the purpose of the program. 
+
+By default, the program **does not allow** the reactant of the objective reaction as seed. But that can be allowed by using this target as seeds option. This can be usefull if there is no solutions without this permission. 
+
+This option is at `False` by default, and if used becomes `True`.
+
+> 💻 **Command:**
+> 
+> ```
+> seed2lp fba [source_file_path] [output_directory_path] -tas
+> ```
+
+> ⚠️ **Warning:**
+> 
+> With this option, one / multiple / all reactants of the objective reaction can be present into the set of seeds.
+
+
+<hr style="border: 1px dotted" > 
+
+<ins> **Forbidden seeds:** </ins> $\quad$ `--forbidden-seeds-file` $\quad$ `-fsf`
+
+It is possible to give a list of metabolites (as file) that are not allowed to be seeds. This option could be interesting to use with the **target as seeds* option, to avoid some targetted metabolites to be seeds, but not all of them.
+
+
+
+> 💻 **Command:**
+> 
+> ```
+> seed2lp fba [source_file_path] [output_directory_path] -fsf
+> ```
+>
+> ```
+> seed2lp fba [source_file_path] [output_directory_path] -tas -fsf
+> ```
+>
+> 📝 **Notes:** The order of the options does not matter
+
+> ⚠️ **Warning:**
+> 
+> This option implies upstream knowledge of metabolites that are not desired as seeds. It may be necessary to first run the command without this option, locate the metabolites not desired as seeds and then run with this option again using the file containing this list of metabolites. 
+
+<br/>
+
+
+<hr style="border: 4px outset" size="8" > 
+<hr style="border: 4px outset" size="8" > 
+
+<br/>
+
+# 📃 Full example
+

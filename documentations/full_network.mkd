@@ -1,0 +1,103 @@
+# Full Network
+
+</br>
+<hr style="border: 4px outset" size="8" > 
+
+## Reasoning
+
+This mode search seeds by ensuring logical constraints and can be used with accumulation constraints of a metabolite.
+
+> 📝 **Notes:**
+>
+> There is no linear calcul, so the stoichiometry of metabolites are not involved into the algorithm of seed searching, such as the boundaries of a reaction.
+
+
+### Logic Algorithm
+After analysing and converting the network a seed resoltuion is performed. Please read the 📜[network analyse document](documentations/network_analyse.mkd) to understand the technical terms
+
+
+#### <ins>Seed searching</ins>
+The Full Network mode set all metabolite as Target. The targets must be in the scope of producible metabolites by the network.
+
+A metabolite is an **external seed** when:
+- The metabolite is a **reactant** of a reaction and **not a product** of any reaction (not exchanged reaction and not reversible reaction). The metabolite is **not a transported⭐ metabolite**
+- The metabolite is **not a product** of any reaction **except his own exchange reaction**
+- Specific case of **reversible transport reaction** involving a **transported⭐ metabolite without any import reaction**. The reversibility prevents Seed2LP to select one of the metabolite as seed because it becomes a product of a reaction. This case is taken into account and the classic metabolite is chossen as seed
+
+> 💬 **Comments:**
+>
+> ⭐ A transported metabolite is a metabolite that is **transferred from one compartment to another**. The formula is therefore generally something like: $\quad$ $\quad$ $M_A_e ⟷ M_A_c  ⟷ M_A_m
+>
+> Because it the same metabolites on different compartment, the program tags **M_A_c and M_A_m as transported** metabolite, therefore **only M_A_e is selected** as seed.
+>
+> This restriction allows to **avoid similar set of seeds** such as {M_A_e, M_B} or {M_A_c, M_B} or {M_A_m, M_B}
+
+
+> 📃 **Example**
+> 
+> Using the reaction below, M_A_c is an R_A is an exchange reaction and the the metaoblite M_A_c is set as **exchange metabolite** and will be chosen as seed because it **complies with the seed external definition**. 
+> M_B_m and M_B_c are both product of the reaction (or the reversible). One of them will be taged as classic metabolite and the other as a transported reaction, then while searching seeds, the **classical M_B** metabolite will be chosen as seeds
+> 
+> ```mermaid
+> flowchart TD
+>   None-->C{R_A};
+>   C-->M_A_c;
+>   M_A_c & M_B_c-->R;
+>   R{R_1}-->M_D_c;
+>   M_B_c-->B{R_B}
+>   M_B_m-->F{Rev_R_B}
+>   B-->M_B_m; 
+>   F-->M_B_c; 
+> ```
+
+There is a set of impossible seeds, which are metabolite that are products but never reactant.
+
+#### <ins>Accumulation</ins>
+
+SBML source file are sometimes are written with **reaction without using the product of this reaction in another reaction**, even export reactions. This is an accumulation **already existing** in the source file.. This type of network can give an unsatisfiable problem. In order to prevent this, Seed2LP forbids by default the accumulation.
+
+The accumulation is forbidden with a constraint:
+ - a metabolite product wich is in the scope (producible metabolite) must be consummed at least once by a reaction
+
+Because most of the time the network doesn't result to an unsatisfiable problem, it is possible to allow the accumulation by using option `--accumulation` / `-accu`. But it is possible that the solution does not ensure flux while testing it with  `--check-flux` / `-cf` option in a second step.
+
+This prohibition of accumulation is not needed when using filter or guess-check mode because the flux calculation with [cobrapy](https://cobrapy.readthedocs.io/en/latest/index.html) is tested for each solution while searching them.
+
+### Classic
+For the classic mode, no other constraints are added to the [**Algorithm**](#Logic-Algorithm). All solutions are selected and outputted without any flux verification.
+
+### Filter
+No other constraints are added to the [**Algorithm**](#Logic-Algorithm), but for all solutions the flux is checked with [cobrapy](https://cobrapy.readthedocs.io/en/latest/index.html), and only the solutions having flux are selected and outputted.
+
+### Guess-Check
+This mode directly interact with the solver during solving by adding new constraints to the [**Algorithm**](#Logic-Algorithm). Flux is checked with [cobrapy](https://cobrapy.readthedocs.io/en/latest/index.html) for every solution proposed by the solver and new constraints are derived out of it to guide the remaining solving process. All outputted solutions have flux natively.
+
+## Diagramm
+
+
+<br/>
+<hr style="border: 1px dotted" > 
+
+## Hybrid
+This mode search seeds by ensuring logical and linear constraints and the accumulation option is not taken into account if used. 
+
+### Logic-Linear Algorithm
+the Logic part of the algorithm is the same as the [reasoning algorithm](#Logic-Algorithm), and add some logic constraints in order to complete linear calcul.
+
+
+
+</br>
+<hr style="border: 4px outset" size="8" > 
+
+# <ins>Application with options</ins>
+
+
+<br/>
+
+
+<hr style="border: 4px outset" size="8" > 
+<hr style="border: 4px outset" size="8" > 
+
+<br/>
+
+# 📃 Full example

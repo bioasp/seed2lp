@@ -1,0 +1,16 @@
+INFO 2024-09-06 08:03:04,300: Seed2LP version: 1.0.0
+INFO 2024-09-06 08:03:04,301: 
+ - R_EX_S1: Reversibility modified.
+ - R_S1: Reversibility modified.
+ - R_EX_S2: Reversibility modified.
+ - R_S2: Reversibility modified.
+ - R_R1: Reversibility modified.
+ - R_R2: Reversibility modified.
+ - R_R3: Reversibility modified.
+ - R_BIOMASS_1: Reversibility modified.
+ - R_R5: Reversibility modified.
+ - R_BIOMASS_2: Reversibility modified.
+ - R_F: Reversibility modified.
+ - R_EX_F: Reversibility modified.
+INFO 2024-09-06 08:03:04,302: Converting Network into ASP facts ...
+INFO 2024-09-06 08:03:04,302: ... DONE

@@ -1,0 +1,6 @@
+include LICENCE.txt MANIFEST.in README.mkd
+exclude Makefile
+recursive-include seed2lp *.py
+recursive-include seed2lp *.lp
+prune networks
+prune test

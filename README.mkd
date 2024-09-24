@@ -1,0 +1,369 @@
+# Seed2LP 
+
+Seed2LP is a Python tool that searches seeds in metabolic networks. It uses answer set programming (ASP) and provides three approaches for seed detection: 
+- [**Full network**](#full-network) mode, that activates all compounds of the metabolic network.
+- [**Target**](#target) mode, that activates metabolites of interest.
+- [**FBA**](#fba) mode, that randomly searches seeds ensuring a positive flux into the objective reaction 
+
+The notebook directory of this repo contains scripts that reproduce the results presented in the associated paper. 
+
+</br>
+<hr style="border: 4px outset" size="8" > 
+
+## Install
+
+**From github**
+```
+pip install git+https://github.com/bioasp/seed2lp
+```
+
+**From repository source after git clone**
+
+```
+pip install .
+```
+or
+```
+python setup.py install
+```
+
+
+</br>
+
+## Requirements
+
+Requires Python >= 3.10. 
+
+For below requirements, installing Seed2LP will install all needed packages if not already installed.
+
+
+
+|  name  |    version        |
+|:----------:|:-------------:|
+| [clyngor](https://github.com/Aluriak/clyngor) | 0.3.18 |
+| [clingo-lpx](https://github.com/potassco/clingo-lpx) | 1.3.0   |
+| [cobrapy](https://cobrapy.readthedocs.io/en/latest/index.html)  | 0.26.0 |
+| [pyyaml](https://pyyaml.org/wiki/PyYAMLDocumentation) | 6.0 |
+| [menetools](https://github.com/cfrioux/MeneTools) | 3.4.0 |
+| [padmet](https://github.com/AuReMe/padmet) | 5.0.1 |
+
+<hr style="border: 4px outset" size="8" > 
+
+## Command examples
+The following examples uses a toy described on Seed2LP paper.
+
+> Get all solutions in all Target modes (Reasoning, Filter, Guess&Check, Guess&Check with Diversity, Hybrid lpx), in all optimisations (subset minimal and minimize)
+>```
+>seed2lp target networks/toys/SBML/toy_paper.SBML results/toys/
+>```
+
+> Get one solution in Full Network in reasoning and check flux
+>```
+>seed2lp full networks/toys/SBML/toy_paper.SBML results/toys/ -nbs 1 -so reasoning -cf
+>```
+
+> Get one solution in FBA only in subset minimal
+>```
+>seed2lp fba networks/toys/SBML/toy_paper.SBML results/toys/ -nbs 1 -m subsetmin
+>```
+
+<hr style="border: 4px outset" size="8" > 
+
+## 📜[Network analyse](documentations/network_analyse.mkd)
+The first step of the tool is to read the network, analyse it to be able to perform a logic analyse of the Network, each reaction must be defined as follows:
+
+$$ Reaction: Set\{reactants\} ⟶ Set\{products\}  \quad  with \quad bounds = [0,\infty]$$
+
+
+For each reaction, multiple factors are verified and correction is done if needed such as swapping set of reactants and set of products if the boundaries of a reaction are negative or deleting reactions with null boundaries. A warning is outputted when changes are done. 
+
+📃 **Output example:**
+
+```
+WARNING : 
+ - R_R2: Deleted.
+     Boundaries was: [0.0 ; 0.0]
+ - R_R7: Reactants and products switched.
+     Boundaries was: [-1000.0 ; 0.0]
+      
+```
+
+## Search mode features
+It is possible to run Seed2LP for all the 3 modes ([**Full network**](#full-network), [**Target**](#target) and [**FBA**](#fba) by changing the command, and for each one to use specifics arguments.
+
+There are also 2 additional features:
+- [**Network**](#network): allows drawing the network from the ASP definition and checking the network ASP decription by comparing with the Cobrapy description, or write into an SBML file the corrected network (exchanging products and reactants or delteing reaction with all boundaries to 0)
+- [**Flux**](#flux): Allows checking the flux with Cobrapy from Seed2LP result files, or any file having the same json structure than Seed2LP.
+
+<br/>
+<hr style="border: 1px dotted" > 
+
+### 📜 [<ins>Full Network</ins>](documentations/full_network.mkd)
+This mode searches seeds with this goal: "activate"/"produce" all reaction/metabolites of the network.
+> 💻 **Command:**
+>
+> ```
+> seed2lp full [network_file] [output_directory] [arguments]
+> ```
+
+There are also two submodes:
+- 📜 [Reasoning](documentations/full_network.mkd#reasoning): Use ASP solving with clingo
+    - **Classic:** Use reasoning (logical, Boolean abstraction of metabolic activity) search only, without calculating flux into objective reaction
+  - **Filter:** Use reasoning search only, but for all results the flux is checked with [cobrapy](https://cobrapy.readthedocs.io/en/latest/index.html), and only the solutions having flux are returned.
+  - **Guess-check:** Use reasoning search and directly interact with the solver during solving by adding new constraints. Flux is checked with [cobrapy](https://cobrapy.readthedocs.io/en/latest/index.html) for every solution proposed by the solver and new constraints are derived out of it to guide the remaining solving process. All outputted solutions have flux natively.
+- 📜 [Hybrid](documentations/full_network.mkd#hybrid): Ensure the resulting model statisfies both logical and flux constraints using a hybrid ASP-LP solver.
+
+<br/>
+<hr style="border: 1px dotted" > 
+
+### 📜 [<ins>Target</ins>](documentations/target.mkd)
+This mode searches seeds with this goal: producing a set of metabolites, or if a reaction is given, ensuring the production of the reactants needed for its activation.
+> 💻 **Command:**
+>
+> ```
+> seed2lp target [network_file] [output_directory] [arguments]
+> ```
+
+There are also two submodes:
+- 📜 [Reasoning](documentations/target.mkd): Use ASP solving with clingo
+  - **Classic:** Use reasoning (logical, Boolean abstraction of metabolic activity) search only, without calculating flux into objective reaction
+    - **Filter:** Use reasoning search only, but for all results the flux is checked with [cobrapy](https://cobrapy.readthedocs.io/en/latest/index.html), and only the solutions having flux are returned.
+    - **Guess-check:** Use reasoning search and directly interact with the solver during solving by adding new constraints. Flux is checked with [cobrapy](https://cobrapy.readthedocs.io/en/latest/index.html) for every solution proposed by the solver and new constraints are derived out of it to guide the remaining solving process. All outputted solutions have flux natively.
+- 📜 [Hybrid](documentations/target.mkd): Ensure the resulting model statisfies both logical and flux constraints using a hybrid ASP-LP solver.
+
+<br/>
+<hr style="border: 1px dotted" > 
+
+### 📜 [<ins>FBA</ins>](documentations/fba.mkd)
+This mode randomly searches seeds by ensuring flux on objective reaction.
+
+> 💻 **Command:**
+>
+> ```
+> seed2lp fba [network_file] [output_directory] [arguments]
+> ```
+
+</br>
+<hr style="border: 4px outset" size="8" > 
+
+## set-mode features
+It is possible to choose what kind of set of seeds to search.
+
+### <ins>Subset minimal</ins>
+The subset minimal (submin) mode finds a set of seeds which satisfies all the constraints, then from this set, it tries to eliminate seeds until it finds the minimal set that will satisfy the constraints.
+
+This method of search **does not guarantee minimality** in terms of size of the set. But it can be a **faster way** to have set of seeds the most minimal possible from a set already validated.
+
+> 📃 **Example:**
+> 
+> Considering all the followings sets of seeds below, that statisfy constraints for the objective, which of them are subset minimal and will be selected?
+> 
+> |  Sets of seeds  |  is choosen ?   |  reasons   |
+> |:--------------:|:---------------:|:-------------:|
+> | {A,B,C,D,E}    |     no          |  {A,B,C} is a set of seeds included into this set|
+> | {A,B,C}        |     yes         | There is no other set smaller included in this set|
+> | {A,D,E,F}      |     no          |{A,D,F} is a set of seeds included into this set |
+> | {A,D,F}        |     yes         | There is no other set smaller included in this set |
+> | {A,C,E,F}      |     yes         |  There is no other set smaller included in this set|
+
+<br/>
+<hr style="border: 1px dotted" > 
+
+### <ins>Minimize</ins>
+The minimize (min) set-mode finds set of seeds of minimal size which satisfies all the constraints.
+
+This method of search **ensures minimality**. But it is computationally more demanding.
+
+> 📃 **Example:**
+> 
+> Considering all the followings sets of seeds below, that statisfy constraints for the objective, which of them are of minimal size and will be selected?
+>
+> |  Sets of seeds  |  is choosen ?   |  reasons   |
+> |:--------------:|:---------------:|:-------------:|
+> | {A,B,C,D,E}    |     no          | There is a smaller set of size 3 existing |
+> | {A,B,C}        |     yes         | This a one of the smaller set |
+> | {A,D,E,F}      |     no          | There is a smaller set of size 3 existing |
+> | {A,D,F}        |     yes         | This a one of the smaller set |
+> | {A,C,E,F}      |     no          | There is a smaller set of size 3 existing|
+
+</br>
+
+</br>
+<hr style="border: 4px outset" size="8" > 
+
+## Results
+For each mode, a result json file is created. This file will write all models for all submodes reasoning / hybrid and **set-mode** subset minimial / minimize.
+
+If the check-flux option is used, `-cf` / `--check-flux`, a tsv file is created with all the fluxes calculated with Cobrapy, and if hybrid submode or fba mode is used, the LP flux found (calculated from ASP).
+
+The results are also written in the terminal.
+
+</br>
+<hr style="border: 4px outset" size="8" > 
+
+## Additional features
+### 📜 [<ins>Network</ins>](documentations/network.mkd)
+This feature can reconstruct a very basic picture of the network from the ASP conversion of the source network (in SBML format).
+- It can create the picture with the reaction names, or without the reaction.
+- It can also create all the reactions description / formula from ASP and Cobrapy and give a difference of both contents.
+- It can write an SBML file derived from the SBML sources after correction of the network
+  - Deletion of reaction with boundaries [0,0]
+  - Exchanging set of reactants and products when boundaries negatives: ie [-1000, 0], [-100; -10], ...
+
+> 💻 **Command:**
+>
+> `seed2lp network [network_file] [output_directory] [arguments]`
+
+<br/>
+<hr style="border: 1px dotted" > 
+
+### 📜 [<ins>Flux</ins>](documentations/flux.mkd)
+This feature allows the calculation, using Cobrapy library, of the flux of the objective function from a result file of seed2lp and save them. This can be a validation of the solutions provided by Seed2LP.
+
+> 💻 **Command:**
+>
+> `seed2lp flux [network_file] [seed2lp_result_file]`
+
+
+
+> 📝 **Notes:**
+>
+> It is possible to do the flux calculation using Cobrapy directly after the seed search by using the argument `-cf` / `--check-flux` on each mode. A tsv file is created with all the fluxes calculated with Cobrapy, and if hybrid submode or fba mode is used, the LP flux found (calculated from ASP).
+
+</br>
+<hr style="border: 4px outset" size="8" > 
+
+## Main 📜 [options](documentations/options.mkd) for [search mode features](#search-mode-features)
+
+### <ins>Data given by user</ins>
+
+|       option           | short|  default |  description | search mode |
+|:----------------------:|:----:|:--------:|:------------:|:-------------:|
+| --targets-file         | -tf  | optional | List of metabolites⭐ and/or <br/>an objective🔆 reaction  as file  | Target |
+| --objective            | -o   | optional | An objective🔆 reaction <br/> as command line | Full Network and FBA |
+| --seeds-file           | -sf  | optional | List of metabolites⭐ known to be seeds and will <br/> be in the initial set of seeds| ALL |
+| --possible-seeds-file  | -psf | optional | List of metabolites⭐ among which the seed selection will be performed <br/> be in the set of seeds | ALL |
+| --forbidden-seeds-file | -fsf | optional | List of metabolites⭐ that can not <br/> be in the set of seeds | ALL |
+
+
+> 📝 **Notes:**
+>
+> **Target** search mode : 
+>
+> - If **no target file** given, the targets will be the **reactants of the objective reaction** found in the SBML file. The flux calculation will be done **on the objective objective reaction** found in the SBML file.
+> - If only **Metabolites** given in the file: the targets will be **these given metabolites**. The flux calculation will be done on the **objective objective reaction** found in the SBML file.
+> - If only **Reaction** given in the file: the targets will be the **reactants of the objective reaction** found in the SBML file. The flux calculation will be done **on this given reaction**
+> - If both **Metabolites** and **Reaction** given in the file: the targets will be **these given metabolites**. The flux calculation will be done **on this given reaction**
+>
+> **Full network** (**hybrid** submode) and **FBA** : 
+>
+>If no objective reaction given, the objective reaction will be the one found in the SBML file for flux calculation.
+
+> 💬 **Comments:**
+>
+> ⭐ One metabolite by line, must be prefixed with "M_" to fit the ID of the SBML file.
+>
+> 🔆 One Objective reaction only, must be prefixed with "R_" to fit the ID of the SBML file.
+
+
+<br/>
+<hr style="border: 1px dotted" > 
+
+### <ins>Set mode</ins>
+
+|    option   | short|  default |  description | search mode |
+|:-----------:|:----:|:--------:|:------------:|:-------------:|
+| --mode | -m | subsetmin | run different set modes: <br/> minimize, subsetmin, all | ALL |
+| --solve  | -so | reasoning | run different submodes: <br/> reasoning, filter, gues-check, hybrid, all | Full Network<br> and Target |
+
+
+<br/>
+<hr style="border: 1px dotted" > 
+
+### <ins>Set of seed restrictions</ins>
+
+|       option           | short|  default |  description | search mode |
+|:----------------------:|:----:|:--------:|:------------:|:-------------:|
+| --targets-as-seeds | -tas | False | If used, targets found are given, <br/> allowed to be in the set of seeds | ALL |
+| --topological-injection | -ti | False | If used, the exchange⭐ metabolite <br/> from source file are set as seeds directly | ALL |
+| --keep-import-reactions | -kir | False | If used, the exchange⭐ reactions <br/> are not deleted during the conversion to ASP| ALL |
+| --accumulation | -accu | False | If used, solutions with possible <br/> accumulating metabolites are allowed | Full Network <br/> and Target |
+
+
+> 💬 **Comments:**
+>
+> ⭐ An **exchange reaction** is defined as a reaction having **one or multiple metabolites** as reactants or products (while the other set must be empty), it represent import or export reactions, and can be reversible or not, written forwards or backwards:
+> - R ⟶ ∅  $\quad$|$\quad$ R ⟷  ∅ $\quad$|$\quad$ R ⟵  ∅
+> - ∅ ⟶ P  $\quad$|$\quad$ ∅ ⟷ P $\quad$|$\quad$ ∅ ⟵  P
+> 
+> An **exchange metabolite** will be the metabolite involved in the exchange reaction
+ 
+
+<br/>
+<hr style="border: 1px dotted" > 
+
+### <ins>Flux</ins>
+
+|       option           | short|  default |  description | search mode |
+|:----------------------:|:----:|:--------:|:------------:|:-------------:|
+| --check-flux | -cf | False  | If used, the Cobrapy flux calculation <br/> from seeds will be executed and saved | ALL |
+|  --maximize-flux | -max | False |  If used, the flux calculation <br/> with ASP will be maximized  | ALL⭐ |
+
+
+> 💬 **Comments:**
+>
+> ⭐ The option is used only in [Hybrid](documentations/hybrid.mkd) mode for [Full Network](documentations/full_network.mkd) and [Target](documentations/target.mkd) search mode features.
+
+
+</br>
+<hr style="border: 4px outset" size="8" > 
+
+## Configuration file
+The application has its own configuration file located [here: seed2lp/config.yaml](seed2lp/config.yaml).
+
+It is possible to use another configuration file by using the option `-conf` or `--config-file`.
+
+But all these configurations are overwritten by the arguments if used. The config file is used as "the default configuration" of your app.
+
+
+</br>
+<hr style="border: 4px outset" size="8" > 
+
+## Output files
+### Result file
+
+<br/>
+<hr style="border: 1px dotted" > 
+
+### Flux file
+
+
+</br>
+<hr style="border: 4px outset" size="8" > 
+<hr style="border: 4px outset" size="8" > 
+
+## Troubleshooting
+### GCC version
+Seed2Lp needs a gcc version >= 7. 
+
+
+> 💻 Linux Commands:
+>
+> **Check your version:**
+>```
+>gcc --version
+>```
+>
+> **Install latest version (here v11):**
+>```
+> sudo apt install gcc-11
+>```
+>
+> **Link to the latest version (here v11):**
+>```
+> sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-11 20
+>```
+> **Check your version:**
+>```
+>gcc --version
+>```

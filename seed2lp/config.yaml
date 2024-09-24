@@ -1,0 +1,26 @@
+###############################
+#    Seed2lp configuration    #
+###############################
+
+seed2lp:
+    # Options
+    verbose                     : False
+    # Searching mode
+    mode                        : "all"  # 'minimize', 'subsetmin', 'all'
+    solve                       : "all"  # 'reasoning', 'hybrid', 'fba', 'all'
+    intersection                : False
+    union                       : False
+    targets_as_seeds            : False
+    topological_injection       : False
+    keep_import_reactions       : False
+    accumulation                : False
+    # Flux
+    check_flux                  : False
+    maximize_flux               : False
+    # Clingo
+    clingo_configuration        : 'jumpy'
+    clingo_strategy             : 'none'
+    time_limit                  : 45
+    number_solution             : 10
+    # Directories
+    temp                        : "tmp/"

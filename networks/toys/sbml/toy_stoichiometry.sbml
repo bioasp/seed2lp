@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<sbml xmlns:fbc="http://www.sbml.org/sbml/level3/version1/fbc/version2" xmlns="http://www.sbml.org/sbml/level3/version1/core" level="3" version="1" sboTerm="SBO:0000624" fbc:required="false">
+    <model fbc:strict="true" id="toy_stoichiometry_2">
+        <listOfUnitDefinitions>
+        <unitDefinition id="mmol_per_gDW_per_hr">
+            <listOfUnits>
+            <unit kind="mole" scale="-3" multiplier="1" exponent="1"/>
+            <unit kind="gram" scale="0" multiplier="1" exponent="-1"/>
+            <unit kind="second" scale="0" multiplier="3600" exponent="-1"/>
+            </listOfUnits>
+        </unitDefinition>
+        </listOfUnitDefinitions>
+        <fbc:listOfObjectives fbc:activeObjective="obj">
+        <fbc:objective fbc:id="obj" fbc:type="maximize">
+            <fbc:listOfFluxObjectives>
+                <fbc:fluxObjective fbc:reaction="R_BIOMASS" fbc:coefficient="1"/>
+            </fbc:listOfFluxObjectives>
+        </fbc:objective>
+        </fbc:listOfObjectives>
+        <listOfParameters>
+        <parameter value="-1000000" id="cobra_default_lb" sboTerm="SBO:0000626" constant="true" units="mmol_per_gDW_per_hr"/>
+        <parameter value="1000000" id="cobra_default_ub" sboTerm="SBO:0000626" constant="true" units="mmol_per_gDW_per_hr"/>
+        <parameter value="0" id="cobra_0_bound" sboTerm="SBO:0000626" constant="true" units="mmol_per_gDW_per_hr"/>
+        </listOfParameters>
+        <listOfCompartments>
+            <compartment id="c" name="cytosol" constant="true"/>
+            <compartment id="r" name="endoplasmic reticulum" constant="true"/>
+            <compartment id="e" name="extracellular space" constant="true"/>
+            <compartment id="g" name="golgi apparatus" constant="true"/>
+            <compartment id="h" name="chloroplast" constant="true"/>
+            <compartment id="m" name="mitochondria" constant="true"/>
+            <compartment id="l" name="lysosome" constant="true"/>
+        </listOfCompartments>
+        <listOfSpecies>
+            <species id="M_S_e" name="M_S_e" compartment="e" boundaryCondition="false"/>
+            <species id="M_S_c" name="M_S_c" compartment="c" boundaryCondition="false"/>
+            <species id="M_A_c" name="M_A_c" compartment="c" boundaryCondition="false"/>
+            <species id="M_B_c" name="M_B_c" compartment="c" boundaryCondition="false"/>
+            <species id="M_C_c" name="M_C_c" compartment="c" boundaryCondition="false"/>
+            <species id="M_D_c" name="M_D_c" compartment="c" boundaryCondition="false"/>
+            <species id="M_T_c" name="M_T_c" compartment="c" boundaryCondition="false"/>
+            <species id="M_T_e" name="M_T_e" compartment="e" boundaryCondition="false"/>
+        </listOfSpecies>
+        <listOfReactions>
+            <reaction id="R_EX_S" name="R_EX_S" reversible="false" fbc:upperFluxBound="cobra_default_ub" fbc:lowerFluxBound="cobra_0_bound">
+                <listOfProducts>
+                    <speciesReference species="M_S_e" stoichiometry="1.0000" />
+                </listOfProducts>
+            </reaction>
+            <reaction id="R_S" name="R_S" reversible="false" fbc:upperFluxBound="cobra_default_ub" fbc:lowerFluxBound="cobra_0_bound">
+                <listOfReactants>
+                    <speciesReference species="M_S_e" stoichiometry="1.0000" />
+                </listOfReactants>
+                <listOfProducts>
+                    <speciesReference species="M_S_c" stoichiometry="1.0000" />
+                </listOfProducts>
+            </reaction>
+            <reaction id="R_R1" name="R_R1" reversible="false" fbc:upperFluxBound="cobra_default_ub" fbc:lowerFluxBound="cobra_0_bound">
+                <listOfReactants>
+                    <speciesReference species="M_S_c" stoichiometry="1.0000" />
+                </listOfReactants>
+                <listOfProducts>
+                    <speciesReference species="M_A_c" stoichiometry="2.0000" />
+                    <speciesReference species="M_B_c" stoichiometry="1.0000" />
+                </listOfProducts>
+            </reaction>
+            <reaction id="R_R2" name="R_R2" reversible="false" fbc:upperFluxBound="cobra_default_ub" fbc:lowerFluxBound="cobra_0_bound">
+                <listOfReactants>
+                    <speciesReference species="M_A_c" stoichiometry="1.0000" />
+                    <speciesReference species="M_B_c" stoichiometry="1.0000" />
+                </listOfReactants>
+                <listOfProducts>
+                    <speciesReference species="M_D_c" stoichiometry="1.0000" />
+                </listOfProducts>
+            </reaction>
+            <reaction id="R_R3" name="R_R3" reversible="false" fbc:upperFluxBound="cobra_default_ub" fbc:lowerFluxBound="cobra_0_bound">
+                <listOfReactants>
+                    <speciesReference species="M_A_c" stoichiometry="1.0000" />
+                </listOfReactants>
+                <listOfProducts>
+                    <speciesReference species="M_C_c" stoichiometry="1.0000" />
+                </listOfProducts>
+            </reaction>
+            <reaction id="R_BIOMASS" name="R_BIOMASS" reversible="false" fbc:upperFluxBound="cobra_default_ub" fbc:lowerFluxBound="cobra_0_bound">
+                <listOfReactants>
+                    <speciesReference species="M_D_c" stoichiometry="1.0000" />
+                    <speciesReference species="M_C_c" stoichiometry="1.0000" />
+                </listOfReactants>
+                <listOfProducts>
+                    <speciesReference species="M_T_c" stoichiometry="1.0000" />
+                </listOfProducts>
+            </reaction>
+            <reaction id="R_T" name="R_T" reversible="false" fbc:upperFluxBound="cobra_default_ub" fbc:lowerFluxBound="cobra_0_bound">
+                <listOfReactants>
+                    <speciesReference species="M_T_c" stoichiometry="1.0000" />
+                </listOfReactants>
+                <listOfProducts>
+                    <speciesReference species="M_T_e" stoichiometry="1.0000" />
+                </listOfProducts>
+            </reaction>
+            <reaction id="R_EX_T" name="R_EX_T" reversible="false" fbc:upperFluxBound="cobra_default_ub" fbc:lowerFluxBound="cobra_0_bound">
+                <listOfReactants>
+                    <speciesReference species="M_T_e" stoichiometry="1.0000" />
+                </listOfReactants>
+            </reaction>
+        </listOfReactions>
+    </model>
+</sbml>

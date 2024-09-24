@@ -1,0 +1,193 @@
+# Network Analyse
+## File description
+The input file are **SBML file** (XML like file used for networks). 
+
+<ins>**Compatibilities**</ins>
+
+| xmlns version | level | version |
+| :-----------  | :---: | :-----: |
+| http://www.sbml.org/sbml/level3/version1/core | 3 | 1 |
+
+
+## Network correction
+The network is read from the SBML source file. To perform a logic analyse of the Network, each reaction must be defined as follows : 
+
+$$ Reaction: Set\{reactants\} ⟶ Set\{products\} $$
+$$ having \quad bounds = [0,n] \quad  with \quad n ∈ \ ]0,\infty[$$ 
+
+
+For each reaction, multiple factors are verified and correction is done if needed.
+
+### Reversible reaction
+A reaction is reversible when the lower boundary is negative and the upper is positive ( such as $[- \infty, \infty]$, $[-10, 100]$). These reversible reactions are then divided into two reaction:
+
+> 📃 **Example:**
+> 
+> $$
+> A ⟷ B [-10, 100] ⟹ \left\{
+>     \begin{array}{ll}
+>         \ A → B  & [0, 100] \\
+>         \ B → A  & [0, 10]
+>     \end{array}
+> \right.
+> $$
+
+The SBML file give a tag "reversible" which does not systematically correlate with the boundaries, this is why Seed2LP does not take that tag into account and only analyse the reversibility of a reaction on its boundaries.
+- If the upper and lower bound have the same sign or is 0 the reaction is not reversible : $[-1000,-10]$ , $[-1000,0]$, $[0, 1000]$, $[10,1000]$, ...
+- Else the reaction is reversible
+
+### "Backward" reaction
+A reaction written "backward" is a reaction with negative boundaries. These reactions are modified by swapping the set of reactants with the set of products.
+> 📃 **Example:**
+> $$ A ⟶ B \quad [-10, 0] ⟹  B ⟶ A  \quad [0, 10]$$ 
+
+>  📃 **Output example:**
+>
+>![](pictures/network_analyse/warning_reaction_backward.png)
+
+### "Deleted" reaction
+A reaction having the eupper and lower bound null is not activated an has to be deleted to not be considered during the logic analyse
+$$bounds = [0,0] \quad ⟹Reaction \quad  deleted$$ 
+
+>  📃 **Output example:**
+>
+>![](pictures/network_analyse/warning_deleted_reaction.png)
+
+### Exchange reaction
+A reaction with no set of products or no set of reactants is considered as "Exchange" reaction. These reaction can involve one or multiple metabolites. The metabolite is also set as exchanged.
+> 📃 **Example:**
+> $$ ∅ → A \quad [0, \infty]   \quad \text{or}  \quad  ∅ → A+B+C \quad [0, \infty] \quad \text{or}  \quad  A+B+C → ∅ \quad [0, \infty]$$
+
+### Import Reaction
+An import reaction is an exchange reaction import a metabolite, meaning the metabolites are the products.
+> 📃 **Example:**
+> $$ ∅ → A \quad [0, \infty]   \quad \text{or}  \quad  ∅ → A+B+C \quad [0, \infty]$$
+
+> <ins>**OPTIONS**</ins>
+>
+> **Default option of Seed2lp**
+> 
+> By default, the import reaction are "removed" to not take into account the environement predefined into the source file.
+> 
+> **option --keep-import-reactions / -kir**
+> 
+> When the otpion is used, the import reaction are kept and the predefined environment is taken into account for the seed searching.
+
+### Transport Reaction
+A reaction is set a "Transport" when:
+- Only one metabolite is involved into the reaction as reactant and product
+- The root of the ID is the same (M_A_e and M_A_c)
+
+The reactant is a classic metabolite and the product will be set as "transport". If several transport reactions follow one another, only the first reactant is set as classic metabolite, all other are set as transported.
+
+This specification allows the logic programming to reduce the combinatorial in order to have more different solutions.
+
+> 📃 **Example:**
+> 
+>  Two chain of transported reaction suh as : 
+> $$ A\_e → A\_c → A\_m \quad \text{and}  \quad  B\_e → B\_c $$
+> and we suppose that A and B are seeds. 
+>
+> All the will be :
+> $$ S = \{A\_e,  B\_e\}, \{A\_e,  B\_c\}, \{A\_c,  B\_e\}, \{A\_c,  B\_c\}, \{A\_m,  B\_e\}, \{A\_m,  B\_c\}, $$
+>
+> When the metabolite $A\_c$, $A\_m$ and $B\_c$ are set as transported, they are exclude as seeds and the the new set of solutions becomes:
+> $$ S = \{A\_e,  B\_e\} $$
+
+
+### Objective Reaction
+When no argument is used for the objective reaction, the tool will find it from the objective list of SBML source file on the "listOfObjectives" xml tag. Several cases exist:
+
+
+<table>
+    <tr>
+        <th style= text-align:center" > Cases </th>
+        <th style="text-align:center">  📃 Output example: </th>
+    </tr>
+    <tr>
+    <td>
+        No objective list or no objective into the list   
+    </td>
+    <td>
+
+![](pictures/network_analyse/objective_not_found.png)
+   </td>
+    </tr>
+    <tr>
+    <td>
+        One objective found into the list with coeff 1  
+    </td>
+    <td>
+
+![](pictures/network_analyse/objective_found.png)
+   </td>
+    </tr>
+    <tr>
+        <td>
+            One objective found into the list without coeff 1   
+        </td>
+
+   <td> 
+   
+   ![](pictures/network_analyse/objective_not_found.png)
+   </td>
+    </tr>
+    <tr>
+        <td>
+            Multiple objectives found into the list with only one having a coeff 1    
+        </td>
+    <td>
+
+![](pictures/network_analyse/objective_found.png)
+   </td>
+    </tr> 
+    <tr>
+        <td>
+            Multiple objectives found into the list with multiple ones having a coeff 1    
+        </td> 
+    <td>
+
+![](pictures/network_analyse/multiple_objective.png)
+   </td>
+    </tr>
+    <tr>
+        <td>
+            Multiple objectives found into the list without anyone having a coeff 1    
+        </td>
+    <td>
+ 
+![](pictures/network_analyse/objective_not_found.png)
+   </td>
+    </tr>
+</table>
+
+
+### Metabolites
+| Type | Tag | Impact |
+| :--: | :-: | :----: |
+| Exchanged metabolite | "exchange" | possible seed and needed to take back import reaction for linear calcul if choosen as seed  |
+| Transported metabolite | "transport" | Reduce combinorial|
+| Classical metabolite | "other" | possible seed |
+
+### Targets
+On target mode, if no metabolite given by the user, the reactant of the objective are set as target.
+
+
+
+## 🔧 Conversion into ASP instance
+### Reversible reaction
+- The backward way reaction has his id prefixed with **rev_**
+- An atom `reversible(R1, rev_R1)` is created
+
+### Removed reaction
+ASP atoms are prefixed by "rm_":
+- `rm_reaction(...)`
+- `rm_reactant(...)`
+- `rm_product(...)`
+- `rm_bounds(...)`
+
+### Objective Reaction
+An objective reaction found are given by user creates an atom `objective(...)`
+
+### Inputs
+when a target, possible_seed, seed or forbidden_seed is given by the user, the corresponding atoms are created

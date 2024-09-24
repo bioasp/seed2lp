@@ -1,0 +1,2 @@
+### Targets
+On target mode, if no metabolite given by the user, the reactant of the objective are set as target.
