@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Get arguments
-while getopts i:r:c:t:o:m:a:s: flag
+while getopts i:r:c:t:o:m:n:a:s:z: flag
 do
     case "${flag}" in
         i) IN_DIRECTORY=${OPTARG};;
@@ -33,6 +33,11 @@ do
         s) 
           if [[ ! -z ${OPTARG} ]]; then
               SOLVE=${OPTARG}
+          fi
+        ;;
+        z) 
+          if [[ ! -z ${OPTARG} ]]; then
+              OPTIMISATION=${OPTARG}
           fi
         ;;
         *) echo "Invalid OPTION" && exit 1;;
@@ -77,6 +82,10 @@ fi
 
 if [[ ! -z ${SOLVE} ]]; then
     OPTION="${OPTION} -so ${SOLVE}"
+fi
+
+if [[ ! -z ${OPTIMISATION} ]]; then
+    OPTION="${OPTION} -m ${OPTIMISATION}"
 fi
 
 seed2lp $COMMAND "$IN_DIRECTORY/$CURRENT_FILE" \

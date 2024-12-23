@@ -37,6 +37,14 @@ if __name__ == '__main__':
         run = mode = "netseed"
         optim = "submin"
         accu = True
+    elif  modes_info == "cobrapy":
+        run = mode = "cobrapy"
+        optim = "minimize"
+        accu = True
+    elif  modes_info == "phylomint":
+        run = mode = "phylomint"
+        optim = "submin"
+        accu = True
     else:
         #'run','mode','optim', accu
         modes_split = modes_info.split("/")
@@ -55,7 +63,7 @@ if __name__ == '__main__':
     net = tree.getroot()
     model = sbml.get_model(net)
 
-    species_set = sbml.get_used_metabolites(sbml_file, False)
+    species_set = sbml.get_used_metabolites(sbml_file)
 
     with open(objective_file) as fd:
         objective = fd.readline()
@@ -126,6 +134,7 @@ if __name__ == '__main__':
             'model':'str',
             'is_equal_union_species':'bool',
             'missing':'str',
+            'percentage_missing':'float',
             'is_biomass_included':'bool',
             'missing_biomass':'str',
             'percentage_missing_biomass':'float',
@@ -149,13 +158,14 @@ if __name__ == '__main__':
 
     # Loop into all solutions of a specie
     for filename in os.listdir(species_scope_dir):
+        if "_compare.tsv" in filename:
+            continue
         scope_file = os.path.join(species_scope_dir, filename)
         model_name=os.path.splitext(filename)[0]
          
         # Get Scope
         f = open(scope_file)
         scope = json.load(f)
-
         scope_set = set(scope['scope'])
 
         # Get Seeds

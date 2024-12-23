@@ -8,18 +8,23 @@
 #SBATCH --mail-user=chabname.ghassemi-nedjad@inria.fr         #Receive email on this adress when the job is begin,over,or fail 
 #SBATCH --mail-type=END,FAIL                  #Define what we want to receive by email about the job statut
 #SBATCH --exclude=arm01
-
+#SBATCH --array=1-107%55                           #107 networks
 
 
 source /home/cghassem/miniconda3/etc/profile.d/conda.sh
-conda activate seed2lp
+conda activate s2lp
 
-
+DATA_DIR="../../analyses/data"
+OBJECTIVE_DIR="${DATA_DIR}/objective"
+SBML_DIR="${DATA_DIR}/bigg/sbml"
 RESULT_DIR="../../analyses/results"
-S2LP_SCOPE_DIR="$RESULT_DIR/scopes_s2lp"
-NETSEED_SCOPE_DIR="$RESULT_DIR/scopes_netseed"
-ICN718_SCOPE_DIR="$RESULT_DIR/scopes_iCN718"
+SCOPE_DIR="$RESULT_DIR/scopes_s2lp_gcd_10_solutions"
 
-./10_2_run_scope_analyse_concat.sh -r $S2LP_SCOPE_DIR
-./10_2_run_scope_analyse_concat.sh -r $NETSEED_SCOPE_DIR
-./10_2_run_scope_analyse_concat.sh -r $ICN718_SCOPE_DIR
+
+LIST_DIR_LEV1=("target")
+LIST_DIR_LEV2=("reasoning_guess_check_diversity")
+LIST_DIR_LEV3=("subset_minimal")
+LIST_DIR_LEV4=("no_accu")
+
+./10_1_run_scope_analyse.sh -r $SCOPE_DIR -s $SBML_DIR -o $OBJECTIVE_DIR \
+            -a $LIST_DIR_LEV1 -b $LIST_DIR_LEV2 -c $LIST_DIR_LEV3 -d $LIST_DIR_LEV4

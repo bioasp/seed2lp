@@ -16,7 +16,7 @@ if __name__ == '__main__':
     sbml_file_path = argv[2]
     out_dir = argv[3]
 
-    species_set = sbml.get_used_metabolites(sbml_file_path, False)
+    species_set = sbml.get_used_metabolites(sbml_file_path)
 
 
     df_count = pd.DataFrame(0,columns=["nb_reasoning", "nb_filter", "nb_gc", "nb_gcd"], index = list(species_set))

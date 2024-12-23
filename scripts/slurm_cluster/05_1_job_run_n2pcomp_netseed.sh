@@ -16,10 +16,10 @@
 source /home/cghassem/miniconda3/etc/profile.d/conda.sh
 conda activate s2lp
 
-DATA_DIR="../../data"
+DATA_DIR="../../analyses/data"
 NORM_SBML_DIR="${DATA_DIR}/sbml_corrected"
 N2PCOMP_DIR="../../N2PComp"
-NETSEED_RESULT_DIR="../../results/netseed"
+NETSEED_RESULT_DIR="../../analyses/results/netseed"
 TOOL="NETSEED"
 
 ./05_1_run_n2pcom.sh -i $NORM_SBML_DIR  -n $N2PCOMP_DIR -r $NETSEED_RESULT_DIR -t $TOOL

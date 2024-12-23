@@ -15,8 +15,8 @@ source /home/cghassem/miniconda3/etc/profile.d/conda.sh
 conda activate s2lp
 
 ########## SERVER ##########
-DATA_DIR="../../data"
-RESULT_DIR="../../results/iCN718_2000"
+DATA_DIR="../../analyses/data"
+RESULT_DIR="../../analyses/results/iCN718_2000"
 SBML_DIR="${DATA_DIR}/bigg/sbml"
 OBJECTIVE_DIR="${DATA_DIR}/objective"
 TEMP_DIR="../../tmp/"

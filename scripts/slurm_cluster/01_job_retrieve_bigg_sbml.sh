@@ -12,7 +12,7 @@
 source /home/cghassem/miniconda3/etc/profile.d/conda.sh
 conda activate s2lp
 
-RESULT_DIR="../../data/"
+RESULT_DIR="../../analyses/data/"
 
 # Cluster
 python ../01_retrieve_bigg_sbml.py $RESULT_DIR

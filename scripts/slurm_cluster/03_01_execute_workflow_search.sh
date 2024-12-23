@@ -13,7 +13,7 @@ source /home/cghassem/miniconda3/etc/profile.d/conda.sh
 conda activate s2lp
 
 # Cluster
-FILE="03_01_job_run_s2lp"
+FILE="03_01_job_run_s2lp.sh"
 ###### EXECUTE FULL NETWORK #######
 ### ALL ###
 # Accumulation Forbidden

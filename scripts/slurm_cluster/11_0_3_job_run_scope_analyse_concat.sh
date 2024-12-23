@@ -16,10 +16,6 @@ conda activate seed2lp
 
 
 RESULT_DIR="../../analyses/results"
-S2LP_SCOPE_DIR="$RESULT_DIR/scopes_s2lp"
-NETSEED_SCOPE_DIR="$RESULT_DIR/scopes_netseed"
-ICN718_SCOPE_DIR="$RESULT_DIR/scopes_iCN718"
+SCOPE_DIR="$RESULT_DIR/scopes_s2lp_gcd_10_solutions"
 
-./10_2_run_scope_analyse_concat.sh -r $S2LP_SCOPE_DIR
-./10_2_run_scope_analyse_concat.sh -r $NETSEED_SCOPE_DIR
-./10_2_run_scope_analyse_concat.sh -r $ICN718_SCOPE_DIR
+./10_2_run_scope_analyse_concat.sh -r $SCOPE_DIR

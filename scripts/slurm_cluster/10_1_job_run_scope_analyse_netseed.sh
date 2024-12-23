@@ -14,10 +14,10 @@
 source /home/cghassem/miniconda3/etc/profile.d/conda.sh
 conda activate s2lp
 
-DATA_DIR="../../data"
+DATA_DIR="../../analyses/data"
 OBJECTIVE_DIR="${DATA_DIR}/objective"
 SBML_DIR="${DATA_DIR}/bigg/sbml"
-RESULT_DIR="../../results"
+RESULT_DIR="../../analyses/results"
 SCOPE_DIR="$RESULT_DIR/scopes_netseed"
 
 
@@ -26,5 +26,5 @@ LIST_DIR_LEV2=("netseed")
 LIST_DIR_LEV3=("other")
 LIST_DIR_LEV4=("accu")
 
-./10_01_run_scope_analyse.sh -r $SCOPE_DIR -s $SBML_DIR -o $OBJECTIVE_DIR \
+./10_1_run_scope_analyse.sh -r $SCOPE_DIR -s $SBML_DIR -o $OBJECTIVE_DIR \
             -a $LIST_DIR_LEV1 -b $LIST_DIR_LEV2 -c $LIST_DIR_LEV3 -d $LIST_DIR_LEV4

@@ -12,7 +12,7 @@
 source /home/cghassem/miniconda3/etc/profile.d/conda.sh
 conda activate s2lp
 
-DATA_DIR="../../data"
+DATA_DIR="../../analyses/data"
 SBML_DIR="${DATA_DIR}/bigg/sbml"
 OBJECTIVE_DIR="${DATA_DIR}/objective"
 

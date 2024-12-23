@@ -17,19 +17,26 @@ source /home/cghassem/miniconda3/etc/profile.d/conda.sh
 conda activate s2lp
 
 
-DATA_DIR="../../data"
-S2LP_RESULT_DIR="../../results/s2lp"
+DATA_DIR="../../analyses/data"
+S2LP_RESULT_DIR="../../analyses/results/s2lp"
 SBML_DIR="${DATA_DIR}/bigg/sbml"
 OBJECTIVE_DIR="${DATA_DIR}/objective"
 TEMP_DIR="../../tmp/"
 
-while getopts c:m:a:s: flag
+while getopts c:m:n:a:s:: flag
 do
     case "${flag}" in
         c) COMMAND=${OPTARG};;
         m) 
           if [[ ! -z ${OPTARG} ]]; then
               MAXIMIZATION=${OPTARG}
+          fi
+        ;;
+        n) 
+          if [[ ! -z ${OPTARG} ]]; then
+              NUMBER_SOLUTION=${OPTARG}
+          else
+              NUMBER_SOLUTION=1000
           fi
         ;;
         a) 
@@ -48,6 +55,9 @@ done
 OPTION=""
 if [[ ! -z ${MAXIMIZATION} ]]; then
     OPTION="-m m"
+fi
+if [[ ! -z ${NUMBER_SOLUTION} ]]; then
+    OPTION="${OPTION} -n $NUMBER_SOLUTION"
 fi
 if [[ ! -z ${ACCUMULATION} ]]; then
     OPTION="${OPTION} -a a"

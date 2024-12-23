@@ -14,10 +14,10 @@
 source /home/cghassem/miniconda3/etc/profile.d/conda.sh
 conda activate s2lp
 
-DATA_DIR="../../data"
+DATA_DIR="../../analyses/data"
 OBJECTIVE_DIR="${DATA_DIR}/objective"
 SBML_DIR="${DATA_DIR}/bigg/sbml"
-RESULT_DIR="../../results"
+RESULT_DIR="../../analyses/results"
 NETSEED_RESULT_DIR="${RESULT_DIR}/precursor"
 NETSEED_FORM_RESULT_DIR="${RESULT_DIR}/precursor_formated_results"
 TOOL="PRECURSOR"

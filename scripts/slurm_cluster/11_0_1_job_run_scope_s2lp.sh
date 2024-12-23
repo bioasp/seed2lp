@@ -8,18 +8,18 @@
 #SBATCH --mail-user=chabname.ghassemi-nedjad@inria.fr         #Receive email on this adress when the job is begin,over,or fail 
 #SBATCH --mail-type=END,FAIL                  #Define what we want to receive by email about the job statut
 #SBATCH --exclude=arm01
-
-
+#SBATCH --array=1-107%25                           #107 networks
 
 source /home/cghassem/miniconda3/etc/profile.d/conda.sh
-conda activate seed2lp
+conda activate s2lp
 
 
+DATA_DIR="../../analyses/data"
+NORM_SBML_DIR="${DATA_DIR}/sbml_corrected"
 RESULT_DIR="../../analyses/results"
-S2LP_SCOPE_DIR="$RESULT_DIR/scopes_s2lp"
-NETSEED_SCOPE_DIR="$RESULT_DIR/scopes_netseed"
-ICN718_SCOPE_DIR="$RESULT_DIR/scopes_iCN718"
+SOLUTION_DIR="$RESULT_DIR/s2lp_gcd_10_solutions"
+SCOPE_DIR="$RESULT_DIR/scopes_s2lp_gcd_10_solutions"
 
-./10_2_run_scope_analyse_concat.sh -r $S2LP_SCOPE_DIR
-./10_2_run_scope_analyse_concat.sh -r $NETSEED_SCOPE_DIR
-./10_2_run_scope_analyse_concat.sh -r $ICN718_SCOPE_DIR
+
+
+./09_run_scope.sh -i $SOLUTION_DIR -s $SCOPE_DIR -n $NORM_SBML_DIR

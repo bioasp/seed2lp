@@ -15,11 +15,11 @@
 source /home/cghassem/miniconda3/etc/profile.d/conda.sh
 conda activate s2lp
 
-DATA_DIR="../../data"
+DATA_DIR="../../analyses/data"
 SBML_DIR="${DATA_DIR}/bigg/sbml"
 SPECIES="iCN718"
 SBML_FILE="${SBML_DIR}/${SPECIES}.xml"
-RESULT_DIR="../../results"
+RESULT_DIR="../../analyses/results"
 OUT_DIR="${RESULT_DIR}/metabolites_${SPECIES}"
 
 # SERVER

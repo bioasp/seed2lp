@@ -16,10 +16,10 @@
 source /home/cghassem/miniconda3/etc/profile.d/conda.sh
 conda activate s2lp
 
-DATA_DIR="../../data"
+DATA_DIR="../../analyses/data"
 NORM_SBML_DIR="${DATA_DIR}/sbml_corrected"
 N2PCOMP_DIR="../../N2PComp"
-PRECURSOR_RESULT_DIR="../../results/precursor"
+PRECURSOR_RESULT_DIR="../../analyses/results/precursor"
 TOOL="PRECURSOR"
 
 ./05_1_run_n2pcom.sh -d $DATA_DIR -i $NORM_SBML_DIR  -n $N2PCOMP_DIR -r $PRECURSOR_RESULT_DIR -t $TOOL
