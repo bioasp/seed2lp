@@ -316,10 +316,17 @@ def cli_parser() -> argparse.ArgumentParser:
         ],
         description=
         """
-        TODO
+        Seed Searching mode focusing on reachability of targetted metabolites (reactants of objective reaction).
+        It is possible to add targets or change the objective reaction by using the option -tf/--targets-file.
+        Multiple solving mode (-so/--solve) are available:
+          - reasoning: Only focus in reachability of metabolites using Network Expanion
+          - filter: First uses Network Expanion, then check the flux with COBRApy inferred by seeds
+          - guess_check: Uses Network Expanion, check flux with COBRApy and return results to solver to dismiss superset of results
+          - guess_check_div: Guess check but also forbids subset of seed as next result in order to reduce intersection of solutions
+          - hybrid: First uses Network Expansion then calculate FBA constraints with clingo-lpx
         """,
         usage="""
-        seed2lp target network_file  \n 
+        seed2lp target network_file  output_dir \n 
         """
     )
 
@@ -340,11 +347,18 @@ def cli_parser() -> argparse.ArgumentParser:
             pp_config,  pp_accumulation
         ],
         description=
-        #TODO
         """
+        Seed Searching mode focusing on reachability of all metabolites of the GSMN.
+        It is possible to change the objective reaction by using the option -o/--objective for flux checking.
+        Multiple solving mode (-so/--solve) are available:
+          - reasoning: Only focus in reachability of metabolites using Network Expanion
+          - filter: First uses Network Expanion, then check the flux with COBRApy inferred by seeds
+          - guess_check: Uses Network Expanion, check flux with COBRApy and return results to solver to dismiss superset of results
+          - guess_check_div: Guess check but also forbids subset of seed as next result in order to reduce intersection of solutions
+          - hybrid: First uses Network Expansion then calculate FBA constraints with clingo-lpx
         """,
         usage="""
-        seed2lp full network_file  \n 
+        seed2lp full network_file output_dir \n 
         """
     )
 
@@ -365,9 +379,9 @@ def cli_parser() -> argparse.ArgumentParser:
             pp_config
         ],
         description=
-        #TODO
         """
-        
+        Random Seed Searching mode focusing in FBA constraints using clingo-lpx solver.
+        It is possible to change the objective reaction by using the option -o/--objective for flux checking.
         """,
         usage="""
         seed2lp fba network_file  \n 
@@ -385,9 +399,11 @@ def cli_parser() -> argparse.ArgumentParser:
             pp_network_details, pp_write_file
         ],
         description=
-        #TODO
         """
-        
+        This functionnality aims to help people with the networks by:
+          - Creating a graph with or without the reactions boxes (-vi/--visualize or -vir/--visualize-without-reaction)
+          - Creating a file with list and formula of reactions from original GSMN, the normalized one and a diff file (-nd/--network-details)
+          - Writing the normalized sbml file (-wf/--write-file)
         """,
         usage="""
         seed2lp network [network_file] [output_dir] --visualize \n 
@@ -401,9 +417,9 @@ def cli_parser() -> argparse.ArgumentParser:
             pp_verbose, pp_network, pp_result, pp_output_dir
         ],
         description=
-        #TODO
         """
-        
+        From Seed2lp seed searching results json file, this functionnality calculate fluxes inferred by seeds for all models using COBRApy.
+        Can be used for other tool results if the results file has the same json structure.
         """,
         usage="""
         seed2lp flux [sbml_file] [seed2lp_result_file] [output_directory] \n 
@@ -412,14 +428,15 @@ def cli_parser() -> argparse.ArgumentParser:
 
     subparsers.add_parser(
         "scope",
-        help="From seeds determine scope of the network. ",
+        help="From seeds determine scope of the network.",
         parents=[
             pp_verbose, pp_network, pp_result, pp_output_dir, pp_temp
         ],
         description=
-        #TODO
         """
-        
+        From Seed2lp seed searching results json file, this functionnality detemine scope inferred by seeeds using Network Expansion.
+        Can be used for other tool results if the results file has the same json structure.
+        The scope calculation is done with MeneTools.
         """,
         usage="""
         seed2lp scope [sbml_file] [seed2lp_result_file] [output_directory] \n 
@@ -433,9 +450,9 @@ def cli_parser() -> argparse.ArgumentParser:
             pp_output_dir
         ],
         description=
-        #TODO
         """
-        
+        Copy the internal configuration fil an dsave it. 
+        The configuration file saved can be modified and reused for all seed searching methods with the option -tmp/--temp
         """,
         usage="""
         seed2lp conf [output_directory] \n 
@@ -449,9 +466,10 @@ def cli_parser() -> argparse.ArgumentParser:
             pp_verbose, pp_network, pp_objective, pp_output_dir
         ],
         description=
-        #TODO
         """
-        
+        From an sbml file, either :
+          - Find the objective and write the reactants into a file
+          - Write the reactants of the given objectve (-o/--objective) into a file
         """,
         usage="""
         seed2lp conf [output_directory] \n 
