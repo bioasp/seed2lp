@@ -2,10 +2,10 @@
 
 """
 import xml.etree.ElementTree as ET
-from re import sub
+from re import sub, match, search
 from . import logger
 
-def register_all_namespaces(file):
+def register_all_namespaces(file:str):
     """Get namespaces for rewriting SBML file
 
     Args:
@@ -16,7 +16,7 @@ def register_all_namespaces(file):
         #print(ns,  namespaces[ns])
         ET.register_namespace(ns, namespaces[ns])
         
-def get_root(file):
+def get_root(file:str):
     """Get etree root
 
     Args:
@@ -32,14 +32,15 @@ def get_root(file):
     f.close()
     
     # Remove the default namespace definition (xmlns="http://some/namespace")
-    xmlstring = sub(r'\sxmlns="[^"]+"', '', xmlstring, count=1)
+    default_namespace = search(r'\sxmlns="[^"]+"', xmlstring).group()
+    xmlstring = sub(default_namespace, '', xmlstring, count=1)
 
     sbml = ET.fromstring(xmlstring)  
     #tree = ET.parse(file)
     #sbml = tree.getroot()
-    return sbml, first_line
+    return sbml, first_line, default_namespace
 
-def get_sbml_tag(element) -> str:
+def get_sbml_tag(element:ET.Element) -> str:
     "Return tag associated with given SBML element"
     if element.tag[0] == "{":
         _, tag = element.tag[1:].split("}")  # uri is not used
@@ -48,7 +49,7 @@ def get_sbml_tag(element) -> str:
     return tag
 
 
-def get_model(sbml):
+def get_model(sbml:ET.Element) -> ET.Element:
     """
     return the model of a SBML
     """
@@ -60,7 +61,7 @@ def get_model(sbml):
             break
     return model_element
 
-def get_listOfSpecies(model):
+def get_listOfSpecies(model:ET.Element) -> list[ET.Element]:
     """
     return list of species of a SBML model
     """
@@ -73,7 +74,7 @@ def get_listOfSpecies(model):
     return listOfSpecies
 
 
-def get_listOfReactions(model) -> list:
+def get_listOfReactions(model:ET.Element) -> list[ET.Element]:
     """return list of reactions of a SBML model"""
     listOfReactions = []
     for e in model:
@@ -84,18 +85,27 @@ def get_listOfReactions(model) -> list:
     return listOfReactions
 
 
-def get_listOfReactants(reaction) -> list:
+def get_listOfReactants(reaction:ET.Element, species:str=None, is_community:bool=False) -> list:
     """return list of reactants of a reaction"""
-    listOfReactants = []
+    listOfReactants = list()
+    listOfReactantsNames = list()
     for e in reaction:
         tag = get_sbml_tag(e)
         if tag == "listOfReactants":
             for meta in e:
-                listOfReactants.append([meta.attrib.get('species'), meta.attrib.get('stoichiometry')])
+                meta_id = meta_name = meta.attrib.get('species')
+                if is_community:
+                    meta_id = sub("^M_", f"M_{species}_",meta_id)
+                listOfReactants.append([meta_id, meta.attrib.get('stoichiometry'), meta_name])
+                
+                # Create a list of only of meta to determine if a reaction will be transport reaction
+                # both list must be the same (same element in reactnats and products)
+                listOfReactantsNames.append(meta_name.rsplit('_', 1)[0])
             break
-    return listOfReactants
+    return listOfReactants, listOfReactantsNames
 
-def get_listOfReactants_from_name(model, reaction_name) -> list:
+
+def get_listOfReactants_from_name(model:ET.Element, reaction_name) -> list[ET.Element]:
     """return list of reactants of a reaction"""
     reactions_list = get_listOfReactions(model)
     for reaction in reactions_list:
@@ -107,26 +117,37 @@ def get_listOfReactants_from_name(model, reaction_name) -> list:
                     break
     return listOfReactants
 
-def get_listOfProducts(reaction) -> list:
+
+def get_listOfProducts(reaction:ET.Element, species:str=None, is_community:bool=False) -> list:
     """return list of products of a reaction"""
-    listOfProducts = []
+    listOfProducts = list()
+    listOfProductsNames = list()
     for e in reaction:
         tag = get_sbml_tag(e)
         if tag == "listOfProducts":
             for meta in e:
-                listOfProducts.append([meta.attrib.get('species'), meta.attrib.get('stoichiometry')])
-            break
-    return listOfProducts
+                meta_id = meta_name  = meta.attrib.get('species')
+                if is_community:
+                    meta_id = sub("^M_", f"M_{species}_",meta_id)
+                listOfProducts.append([meta_id, meta.attrib.get('stoichiometry'), meta_name])
 
-def get_reaction_from_name(model, fbc, reaction_name) -> list:
+                # Create a list of only of meta to determine if a reaction will be transport reaction
+                # both list must be the same (same element in reactnats and products)
+                listOfProductsNames.append(meta_name.rsplit('_', 1)[0])
+            break
+    return listOfProducts, listOfProductsNames
+
+
+def get_reaction_from_name(model:ET.Element, reaction_name) -> list[ET.Element]:
     """return list of reactants of a reaction"""
     reactions_list = get_listOfReactions(model)
     for reaction in reactions_list:
         if reaction_name == reaction.attrib['id']:
             return reaction
-    raise ValueError(f"ERROR: No reaction {reaction_name} found in list of reactions \n")
+    raise ValueError(f"No reaction {reaction_name} found in list of reactions \n")
 
-def get_fbc(sbml):
+
+def get_fbc(sbml:ET.Element):
     """
     return the fbc namespace of a SBML
     """
@@ -138,7 +159,8 @@ def get_fbc(sbml):
                 break
     return fbc
 
-def get_listOfParameters(model)-> dict:
+
+def get_listOfParameters(model:ET.Element)-> dict:
     """return list of reactions of a SBML model"""
     listOfParameters = dict()
     for e in model:
@@ -149,8 +171,35 @@ def get_listOfParameters(model)-> dict:
             break
     return listOfParameters
 
+
+def get_parameters(model:ET.Element) -> list[ET.Element]:
+    """
+    return list of parameters of a SBML model
+    """
+    listOfParameters = None
+    for e in model:
+        tag = get_sbml_tag(e)
+        if tag == "listOfParameters":
+            listOfParameters = e
+            break
+    return listOfParameters
+
+
+def get_objectives(model:ET.Element) -> list[ET.Element]:
+    """
+    return list of parameters of a SBML model
+    """
+    listOfObjective = None
+    for e in model:
+        tag = get_sbml_tag(e)
+        if tag == "listOfObjectives":
+            listOfObjective = e
+            break
+    return listOfObjective
+
+
 def get_listOfFluxObjectives(model,fbc)-> list:
-    """return list of reactions of a SBML model"""
+    """return list of objective reactions of a SBML model"""
     listOfFluxObjectives = list()
 
     for e in model:
@@ -161,13 +210,13 @@ def get_listOfFluxObjectives(model,fbc)-> list:
                     for o in lo:
                         name = o.attrib.get('{'+fbc+'}reaction')
                         coef = o.attrib.get('{'+fbc+'}coefficient')
-                        reaction = get_reaction_from_name(model, fbc, name)
+                        reaction = get_reaction_from_name(model, name)
                         listOfFluxObjectives.append([name,coef,reaction])
             break
     return listOfFluxObjectives
 
 
-def read_SBML_species(filename):
+def read_SBML_species(filename)-> dict:
     """Yield names of species listed in given SBML file"""
     model_dict = dict()
     tree = ET.parse(filename)
@@ -185,8 +234,10 @@ def read_SBML_species(filename):
     model_dict['Reactions'] = reactions_list
     return model_dict
 
-def get_used_metabolites(filename, call_log=True):
+
+def get_used_metabolites(filename, call_log=False)-> set:
     """Determine from source file the truly used metabolite (and not the list of species)
+    Necessary for scripts 10_1_scope_analyse.py and 10_3_iCN718_metabolite_analyses.py
 
     Args:
         filename (str): Path to thie SBML file
@@ -214,8 +265,8 @@ def get_used_metabolites(filename, call_log=True):
             logger.log.warning(f"Reaction {reaction.attrib['id']} deleted, boudaries [0,0]")
             continue
         else:
-            reactants = get_listOfReactants(reaction)
-            products = get_listOfProducts(reaction)
+            reactants,_ = get_listOfReactants(reaction,"",False)
+            products,_ = get_listOfProducts(reaction,"",False)
             for reactant in reactants:
                 used_metabolites.add(reactant[0])
             for product in products:
@@ -225,7 +276,7 @@ def get_used_metabolites(filename, call_log=True):
 
 
 
-def etree_to_string(model):
+def etree_to_string(model) -> str:
     return str(ET.tostring(model, encoding='utf-8', method='xml'),'UTF-8')
 
 def create_sub_element(element:ET.Element, sub_element:str):
@@ -244,3 +295,13 @@ def remove_reaction(model:ET.Element, element:ET.Element):
         tag = get_sbml_tag(e)
         if tag == "listOfReactions":
             e.remove(element)
+
+def check_remove_objective(model:ET.Element, reaction:ET.Element, fbc):
+    for e in model:
+        tag = get_sbml_tag(e)
+        if tag == "listOfObjectives":
+            for lo in e[0]:
+                if lo:
+                    for o in lo:
+                        if o.attrib.get('{'+fbc+'}reaction') == reaction.attrib['id']:
+                            lo.remove(o)

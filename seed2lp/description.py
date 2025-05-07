@@ -347,136 +347,63 @@ class Description(Network):
         else:
             logger.log.warning("IMPORT REACTION REMOVED BY DEFAULT")
             logger.log.warning("If you want to keep import reaction\nuse option -kir / --keep-import-reactions")
-        model = SBML.get_model(self.sbml)
-        original_reactions = SBML.get_listOfReactions(model)
+        species=self.name
+        original_reactions = SBML.get_listOfReactions(self.model[species])
 
         # Need Two loop to remove first then two do modification
         # If removing while looping, then the loop misses some reactions
         # because the index of the reaction changes
         rm_reac_message = "Reaction removed:"
-        is_rm = False
+        modif_rev_message = "Reaction with tag reversible modified:"
+        switch_meta_message = "Reaction with Reactants and Products exchanged:"
+        rm_import_message = "Import reaction removed:"
+
+        is_modif_rev_log = False
+        is_switch_meta_log = False
+        is_rm_import_log = False
         for reaction in original_reactions:
             reaction_name = reaction.attrib.get("id")
             if reaction_name in self.deleted_reactions:
-                SBML.remove_reaction(model,reaction)
-                is_rm = True
+                self.sbml_remove_reaction(reaction, species)
                 rm_reac_message+=f"\n\t- {reaction_name}"
-        if is_rm:
-            logger.log.info(rm_reac_message)
+                logger.log.info(rm_reac_message)
+            else:
+                # Change the reversibility
+                is_modif_rev = self.sbml_review_reversibilty(reaction_name, reaction)
+                is_modif_rev_log = is_modif_rev_log or is_modif_rev
+                if is_modif_rev:
+                    modif_rev_message+=f"\n\t- {reaction_name}"
 
-        modif_rev_message = "Reaction with tag reversible modified:"
-        is_modif_rev = False
-        exch_meta_message = "Reaction with Reactants and Products exchanged:"
-        is_exch_meta = False
-        rm_import_message = "Import reaction removed:"
-        is_rm_import = False
-        for reaction in original_reactions:
-            reaction_name = reaction.attrib.get("id")
-            # Change the reversibility
-            if reaction_name in self.reversible_modified_reactions:
-                index = self.reversible_modified_reactions[reaction_name]
-                reaction.attrib["reversible"] = str(self.reactions[index].reversible).lower()
-                is_modif_rev = True
-                modif_rev_message+=f"\n\t- {reaction_name}"
+                # switch reactants and products
+                is_switch_meta = self.sbml_switch_meta(reaction_name, reaction, species)
+                is_switch_meta_log = is_switch_meta_log or is_switch_meta
+                if is_switch_meta: 
+                    switch_meta_message+=f"\n\t- {reaction_name}"
 
-            # Exchange list of reactants and product if they are tagged as modified
-            # The modification tag is only on exchanging reactants and products
-            # Reaction written backward will be wrote forward
-            if reaction_name in self.meta_modified_reactions:
-                index = self.meta_modified_reactions[reaction_name]
-                has_reactant=False
-                has_product=False
-                reactants=list()
-                products=list()
-                # loop into source
-                for element in reaction:
-                    # copy and remove list of reactant and products from source
-                    if SBML.get_sbml_tag(element) == "listOfReactants":
-                        reactants = copy.copy(element)
-                        has_reactant = True
-                        SBML.remove_sub_elements(element)
-                    elif SBML.get_sbml_tag(element) == "listOfProducts":
-                        products = copy.copy(element)
-                        has_product=True
-                        SBML.remove_sub_elements(element)
+                # remove import reactions
+                if not self.keep_import_reactions: 
+                    is_rm_import = self.sbml_remove_import(reaction_name, reaction, species)
+                    is_rm_import_log = is_rm_import_log or is_rm_import
+                    if is_rm_import: 
+                        rm_import_message+=f"\n\t- {reaction_name}"
 
-                # add the new element into source node 
-                # put products into reactant and reactant into products
-                recreate_other_node=True
-                for element in reaction:
-                    if SBML.get_sbml_tag(element) == "listOfReactants":
-                        #check if node listOfProducts exist and copy element
-                        if has_product:
-                            SBML.add_metabolites(element, products)
-                        elif recreate_other_node:
-                            # the node listOfProducts doesnt exist it needs to be created
-                            SBML.create_sub_element(reaction, "listOfProducts")
-                            #copy the element of reactant (exchanging reactant and products)
-                            SBML.add_metabolites(element, reactants)
-                            recreate_other_node=False
-                            SBML.remove_sub_elements(element)
-                    elif SBML.get_sbml_tag(element) == "listOfProducts" and has_reactant:
-                        if has_reactant:
-                            SBML.add_metabolites(element, reactants)
-                        elif recreate_other_node:
-                            SBML.create_sub_element(reaction, "listOfReactants")
-                            SBML.add_metabolites(element, products)
-                            recreate_other_node=False
-                            SBML.remove_sub_elements(element)
-                # MODIFIER LES BOUNDARIES
-                if self.parameters:
-                    self.parameters[f'{reaction_name}_lower_bound'] = self.reactions[index].lbound
-                    self.parameters[f'{reaction_name}_upper_bound'] = self.reactions[index].ubound
-                    reaction.attrib['{'+self.fbc+'}lowerFluxBound']= f'{reaction_name}_lower_bound'
-                    reaction.attrib['{'+self.fbc+'}upperFluxBound']= f'{reaction_name}_upper_bound'
-                else:
-                    reaction.attrib['{'+self.fbc+'}lowerFluxBound']= self.reactions[index].lbound
-                    reaction.attrib['{'+self.fbc+'}upperFluxBound']= self.reactions[index].ubound
-
-                is_exch_meta = True
-                exch_meta_message+=f"\n\t- {reaction_name}"
-
-
-            if not self.keep_import_reactions and  reaction_name in self.exchanged_reactions:
-                index = self.exchanged_reactions[reaction_name]
-                self.parameters[f'{reaction_name}_lower_bound'] = self.reactions[index].lbound
-                self.parameters[f'{reaction_name}_upper_bound'] = self.reactions[index].ubound
-                reaction.attrib['{'+self.fbc+'}lowerFluxBound']= f'{reaction_name}_lower_bound'
-                reaction.attrib['{'+self.fbc+'}upperFluxBound']= f'{reaction_name}_upper_bound'
-                is_rm_import = True
-                rm_import_message+=f"\n\t- {reaction_name}"
-
-        if is_modif_rev:
+        #print and log
+        if is_modif_rev_log:
             logger.log.warning(modif_rev_message)
-        if is_exch_meta:
-            logger.log.warning(exch_meta_message)
-        if is_rm_import:
+        if is_switch_meta_log:
+            logger.log.warning(switch_meta_message)
+        if is_rm_import_log:
             logger.log.warning(rm_import_message)
 
         # Replace list of parameters because we added new specific parameters for the exchange reactions
-        parameters_copy = copy.copy(self.parameters)
+        self.sbml_review_parameters(species)
 
-        for el in model:
-            tag = SBML.get_sbml_tag(el)
-            if tag == "listOfParameters":
-                node = copy.deepcopy(el[0])
-                for param in el:
-                    id = param.attrib.get('id')
-                    # Corrects the already existant parameters 
-                    if id in parameters_copy:
-                        param.attrib['value'] = str(parameters_copy[id])
-                        # delete the existant parameter from the list of parameter to keep
-                        # only the new parameters
-                        parameters_copy.pop(id)
-                # create new paramaters node
-                for key, value in parameters_copy.items():
-                    new_node = copy.deepcopy(node)
-                    new_node.attrib['id'] = key
-                    new_node.attrib['value'] = str(value)
-                    el.append(new_node)
+
+        def_ns=self.default_namespace.split("=")
+        self.sbml[species].set(def_ns[0], def_ns[1].replace('"',''))
 
         file_path = path.join(self.out_dir, self.name+".xml") 
-        str_model =  self.sbml_first_line+SBML.etree_to_string(self.sbml)
+        str_model =  self.sbml_first_line+SBML.etree_to_string(self.sbml[species])
         print(f"File saved at: {file_path}")
         save(file_path, str_model)
 

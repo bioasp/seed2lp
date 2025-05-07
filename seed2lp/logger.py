@@ -37,14 +37,10 @@ class ColoredFormatter(logging.Formatter):
 
 
 def __init_logger__(log_path:str):
-    """_summary_
+    """Init logger depending on log_path (and therefor run_mode)
 
     Args:
-        log_path (str): _description_
-        debug (bool): _description_
-
-    Returns:
-        _type_: _description_
+        log_path (str): Full path of logger file
     """
     global log
     #logging.config.fileConfig(path.join(ROJECT_DIR,'log_conf.yaml'))

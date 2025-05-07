@@ -6,8 +6,8 @@ seed2lp:
     # Options
     verbose                     : False
     # Searching mode
-    mode                        : "all"  # 'minimize', 'subsetmin', 'all'
-    solve                       : "all"  # 'reasoning', 'hybrid', 'fba', 'all'
+    mode                        : "all"  # 'minimize', 'subsetmin', 'all' / for single network
+    solve                       : "all"  # 'reasoning', 'filter', 'guess_check', 'guess_check_div', 'hybrid', 'all'
     intersection                : False
     union                       : False
     targets_as_seeds            : False
@@ -24,3 +24,33 @@ seed2lp:
     number_solution             : 10
     # Directories
     temp                        : "tmp/"
+
+seed2lp_com:
+    # Options
+    verbose                     : False
+    # Searching mode
+    community_mode              : "bisteps"  # 'bisteps', 'global', 'delsupset' 
+    solve                       : "all"  # 'reasoning', 'filter', 'guess_check', 'guess_check_div', 'all'
+    intersection                : False
+    union                       : False
+    targets_as_seeds            : False
+    topological_injection       : False
+    keep_import_reactions       : False
+    accumulation                : False
+    # Flux
+    check_flux                  : False
+    equality_flux               : False
+    # Clingo
+    clingo_configuration        : 'jumpy'
+    clingo_strategy             : 'none'
+    time_limit                  : 45
+    number_solution             : 10
+    # Directories
+    temp                        : "tmp/"
+
+flux_com:
+    # Directories
+    equality_flux               : False
+    temp                        : "tmp/"
+
+

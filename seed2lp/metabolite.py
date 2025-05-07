@@ -5,32 +5,19 @@
 #   - compartment (str): character of the compartment of metabolite
 
 class Metabolite:
-    def __init__(self, name:str, stoichiometry:float=None, meta_type:str=""):
+    def __init__(self, id_meta:str, name:str, stoichiometry:float=None, meta_type:str="", 
+                 species:str=""):
         """Initialize Object Metabolite
 
         Args:
             name (str): Name / ID of the Metabolite
             stoichiometry (int, optional): Stoichiometry of the metabolite if into a reactions. Defaults to None.
         """
+        self.id_meta = id_meta
         self.name = name
         self.stoichiometry = stoichiometry
         self.type = meta_type
-
-    ######################## GETTER ########################
-    def _get_name(self,):
-        return self.name
-
-    def _get_stoichiometry(self,):
-        return self.stoichiometry
-    ########################################################
-
-    ######################## SETTER ########################
-    def _set_name(self, name:str):
-        self.name  =  name
-
-    def _set_stoichiometry(self, stoichiometry:float):
-        self.stoichiometry = stoichiometry
-    ########################################################
+        self.species = species
 
 
     ######################## METHODS ########################
@@ -49,12 +36,11 @@ class Metabolite:
         match metabolite_type:
             case "reactant"|"product":
                 
-                facts += f'{metabolite_type}("{self.name}","{"{:.10f}".format(self.stoichiometry)}","{reaction_name}","{self.type}").\n'
+                facts += f'{metabolite_type}("{self.id_meta}","{"{:.10f}".format(self.stoichiometry)}","{reaction_name}","{self.type}","{self.name}","{self.species}").\n'
             case "seed":
-                facts += f'{metabolite_type}("{self.name}","{self.type}").\n'
+                facts += f'{metabolite_type}("{self.id_meta}","{self.type}","{self.name}").\n'
             case _:
-                facts += f'{metabolite_type}("{self.name}","{"{:.10f}".format(self.stoichiometry)}","{reaction_name}","{self.type}").\n'
+                facts += f'{metabolite_type}("{self.id_meta}","{"{:.10f}".format(self.stoichiometry)}","{reaction_name}","{self.type}","{self.name}","{self.species}").\n'
         return facts
-
 
     ########################################################

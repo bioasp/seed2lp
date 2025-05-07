@@ -31,19 +31,33 @@ from . import color
 class ASP_CLINGO:
     SRC_DIR = path.dirname(path.abspath(__file__))
     ASP_SRC_SEED_SOLVING = path.join(SRC_DIR, 'asp/seed-solving.lp')
+    ASP_SRC_CONSTRAINTS_TARGET = path.join(SRC_DIR, 'asp/constraints_targets.lp')
     ASP_SRC_MINIMIZE = path.join(SRC_DIR, 'asp/minimize.lp')
     ASP_SRC_FLUX = path.join(SRC_DIR, 'asp/flux.lp')
     ASP_SRC_MAXIMIZE_FLUX = path.join(SRC_DIR, 'asp/maximize_flux.lp')
     ASP_SRC_MAXIMIZE_PRODUCED_TARGET = path.join(SRC_DIR, 'asp/maximize_produced_target.lp')
+    ASP_SRC_COMMUNITY = path.join(SRC_DIR, 'asp/community_search.lp')
+    ASP_SRC_SHOW_SEEDS = path.join(SRC_DIR, 'asp/show_seeds.lp')
+    ASP_SRC_SHOW_TRANSFERS = path.join(SRC_DIR, 'asp/show_tranfers.lp')
+    ASP_SRC_LIMIT_TRANSFERS = path.join(SRC_DIR, 'asp/limit_transfers.lp')
+    ASP_SRC_ATOM_TRANSF = path.join(SRC_DIR, 'asp/atom_for_transfers.lp')
+    ASP_SRC_ATOMS = path.join(SRC_DIR, 'asp/definition_atoms.lp')
+    ASP_SRC_COM_HEURISTIC = path.join(SRC_DIR, 'asp/community_heuristic.lp')
+    ASP_SRC_SEED_EXTERNAL = path.join(SRC_DIR, 'asp/seed_external.lp')
     CLINGO_CONFIGURATION = {
             'minimize-enumeration': ['--project=show', '--opt-mode=enum'],
             'minimize-union':  ['--enum-mode=brave', '--opt-mode=enum'],
             'minimize-intersection': ['--enum-mode=cautious', '--opt-mode=enum'],
             'minimize-one-model': None,
-            'submin-enumeration': ['--heuristic=Domain', '--enum-mode=domRec', '--dom-mod=5,16'],
-            'submin-intersection': ['--heuristic=Domain', '--enum-mode=cautious', '--dom-mod=5,16'],
+            'submin-enumeration': ['--heuristic=Domain', '--enum-mode=domRec', '--dom-mod=5,16'], # modifier 5: false / pick 16 : Atoms that are shown
+            'submin-intersection': ['--heuristic=Domain', '--enum-mode=cautious', '--dom-mod=5,16'], # modifier 5: false / pick 16 : Atoms that are shown
             }
     ASW_FLAG, OPT_FLAG, OPT_FOUND = 'Answer: ', 'Optimization: ', 'OPTIMUM FOUND'
+
+@dataclass
+class GROUNDING:
+    #TODO: CLEAN GROUND MODE IF NOT USED
+    GROUND = False
 
 ###################################################################
 ########################## Class  Solver ########################## 
@@ -55,7 +69,7 @@ class Solver:
                  intersection:bool=False, union:bool=False, 
                  minimize:bool=False, subset_minimal:bool=False,
                  temp_dir:str=None, short_option:str=None, run_solve:str=None,
-                 verbose:bool=False):
+                 verbose:bool=False, community_mode:str=None):
         """"Initialize Object Solver
 
         Args:
@@ -77,6 +91,7 @@ class Solver:
 
         self.is_linear:bool
         self.asp = ASP_CLINGO()
+        self.ground = GROUNDING().GROUND
         self.run_mode = run_mode
         self.network = network
         self.time_limit_minute = time_limit_minute
@@ -110,7 +125,10 @@ class Solver:
             self.diversity = False
         self.grounded = str()
         self.temp_result_file = str()
-        
+        self.community_mode = community_mode
+
+        self.asp_files = [self.asp.ASP_SRC_SEED_SOLVING, self.asp.ASP_SRC_CONSTRAINTS_TARGET, self.asp.ASP_SRC_ATOMS]
+        self._set_instance_file()
 
     
     ######################## SETTER ########################
@@ -151,6 +169,7 @@ class Solver:
         filename = f'instance_{self.network.name}_{self.short_option}'
         self.network.instance_file = path.join(self.temp_dir,f'{filename}.lp')
         write_instance_file(self.network.instance_file, self.network.facts)
+        self.asp_files.append(self.network.instance_file)
         logger.log.info(f"Instance file written: {self.network.instance_file}")
 
     
@@ -227,6 +246,18 @@ class Solver:
                     logger.print_log('Info: Targets are reactant of objective', "info")
                 logger.print_log("Search seeds aleatory…",'debug')
                 self.clingo_constant.append('run_mode=fba')
+            case 'community':
+                match self.community_mode:
+                    case "global":
+                        logger.print_log("Community Mode : Global Subset Minimal", "info")
+                    case "bisteps":
+                        logger.print_log("Community Mode : Bisteps Subset Minimal", "info")
+                    case "delsupset":
+                        logger.print_log("Community Mode : Delete superset of seeds", "info")
+                if not self.network.targets_as_seeds:  
+                    logger.print_log('Option: TARGETS ARE FORBIDDEN SEEDS', "info")
+                logger.print_log(f'Search seeds validating the {len(self.network.targets)} targets…','debug')
+                self.clingo_constant.append('run_mode=target')
 
         if self.network.accumulation:
             logger.print_log('ACCUMULATION: Authorized', "info")
@@ -299,3 +330,4 @@ class Solver:
                 logger.print_log(f"\n····· {color.bold}Guess-Check with diversity mode{color.reset} ······", "info")  
 
    
+    

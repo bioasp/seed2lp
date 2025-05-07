@@ -45,14 +45,15 @@ class Hybrid(Solver):
         """
         super().__init__(run_mode, network, time_limit_minute, number_solution, clingo_configuration, 
                          clingo_strategy, intersection, union, minimize, subset_minimal, temp_dir, short_option, run_solve, verbose)
-
+        
         self.is_linear = True
         self.maximize_flux = maximize_flux
         self.temp_dir = temp_dir
         self.short_option = short_option
+        self.asp_files.append(self.asp.ASP_SRC_FLUX)
+        self.asp_files.append(self.asp.ASP_SRC_SHOW_SEEDS)
         self.get_init_message()
         self._init_clingo_constant()
-        self._set_instance_file()
         
 
     ######################## METHODS ########################
@@ -87,7 +88,8 @@ class Hybrid(Solver):
             self.get_message('optimum error')
             self.get_message('end')
             return
-        files = [self.network.instance_file, self.asp.ASP_SRC_SEED_SOLVING, self.asp.ASP_SRC_FLUX]
+
+        files = self.asp_files.copy()
         if self.maximize_flux:
             files.append(self.asp.ASP_SRC_MAXIMIZE_FLUX)
         if self.subset_minimal:

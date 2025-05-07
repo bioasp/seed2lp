@@ -1,7 +1,6 @@
 from os import path, makedirs, stat, remove
 from json import dump, load
 from csv import writer, reader
-import argparse
 from . import logger
 
 
@@ -12,13 +11,13 @@ def existant_path(inpath:str) -> str:
         inpath (str): Network input path
 
     Raises:
-        argparse.ArgumentTypeError: Error if the file doesn't exist
+        : Error if the file doesn't exist
 
     Returns:
         str: Network input path
     """
     if not path.exists(inpath):
-        raise argparse.ArgumentTypeError("file {} doesn't exists".format(inpath))
+        raise FileNotFoundError("File {} doesn't exists".format(inpath))
     return inpath
 
 def is_valid_dir(dirpath):
@@ -121,7 +120,8 @@ def delete(filepath:str):
     Args:
         filepath (str): Path of File to delete
     """
-    remove(filepath)
+    if path.exists(filepath):
+        remove(filepath)
 
 def load_json(filepath:str):
     """Load a json file into a variable

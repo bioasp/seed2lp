@@ -1,0 +1,1 @@
+#external seed(A,B,C,D): metabolite(A,B,C,D).

@@ -10,7 +10,8 @@ from seed2lp.metabolite import Metabolite
 from . import logger
 
 class Reaction:
-    def __init__(self, name:str, reversible:bool=False, lbound:float=None, ubound:float=None):
+    def __init__(self, name:str, reversible:bool=False, lbound:float=None, ubound:float=None, 
+                 species:str=""):
         """Initialize Object Reaction
 
         Args:
@@ -29,6 +30,8 @@ class Reaction:
         self.is_transport = False
         self.is_meta_modified = False
         self.is_reversible_modified = False
+        self.species = species
+        self.has_rm_prefix = False
 
 
     ######################## SETTER ########################
@@ -41,55 +44,60 @@ class Reaction:
 
     ######################## METHODS ########################
     def add_metabolites_from_list(self, metabolites_list:list, metabolite_type:str,
-                                  meta_exchange_list:list, meta_transport_list:list):
+                                  meta_exchange_list:list, meta_transport_list:list,
+                                  used_meta:dict):
         """Add all Metabolite from a list as a Reactant or Product list
 
         Args:
             metabolites_list (list): List of metabolite
-            metabolite_type (str): Type of metabolite to construc object list (Reactant or Product)
+            metabolite_type (str): Type of metabolite to construct object list (Reactant or Product)
             meta_exchange_list (list): List of exchanged metabolite
             meta_transport_list (list): List of transport metabolite
+            used_meta (dict): Dictionnary of used metabolite in the network contining list of reaction they appeared
         """
         meta_list=[]
         for meta in metabolites_list:
-            metabolite = Metabolite(meta[0],round(float(meta[1]),10))
+            metabolite = Metabolite(meta[0], meta[2], round(float(meta[1]),10), species=self.species)
             # A reaction is an exchange reaction
             # Exchange reaction involving multiple metabolites are not considered as exchange
             # but will me removed into write_facts() function
             if self.is_exchange:
                 # The metabolite is tagged as exchange
-                meta_exchange_list.append(metabolite.name)
-                if metabolite.name in meta_transport_list:
-                    meta_transport_list.remove(metabolite.name)
+                if metabolite.id_meta  not in meta_exchange_list:
+                    meta_exchange_list.append(metabolite.id_meta)
+                if metabolite.id_meta in meta_transport_list:
+                    meta_transport_list.remove(metabolite.id_meta)
             # we do not want to change exchange tag into transport tag
             # The reaction has to be taggued transport
-            # if the reaction is not reversible, only the product is taggued transport
-            # if the reaction is reversible both can be transported
             elif self.is_transport \
-                and (metabolite.name not in meta_exchange_list) \
-                and metabolite_type == "product":
+                and (metabolite.id_meta not in meta_exchange_list):
                 # The metabolite is tagged as exchange
-                meta_transport_list.append(metabolite.name)
+                if metabolite.id_meta  not in meta_transport_list:
+                    meta_transport_list.append(metabolite.id_meta)
                 metabolite.type = "transport"
             # A reaction is not an exchange reaction nor transport reaction 
             # Exchange reactions involving multiple metabolites are treated like intern metabolite
             else:
                 # Check if the metabolite already existe in list of network
-                if metabolite.name in meta_exchange_list:
+                if metabolite.id_meta in meta_exchange_list:
                     metabolite.type = "exchange"
-                elif metabolite.name in meta_transport_list:
+                elif metabolite.id_meta in meta_transport_list:
                     metabolite.type = "transport"
                 else:
                     metabolite.type = "other"
             meta_list.append(metabolite)
+            if metabolite.id_meta in used_meta:
+                used_meta[metabolite.id_meta].append(self.name)
+            else:
+                used_meta[metabolite.id_meta] = [self.name]
         
-        meta_list.sort(key=lambda x: x.name)
+        meta_list.sort(key=lambda x: x.id_meta)
         match metabolite_type:
             case "reactant":
                 self._set_reactants(meta_list)
             case "product":
                 self._set_products(meta_list)
-        return meta_exchange_list, meta_transport_list
+        return meta_exchange_list, meta_transport_list, used_meta
 
 
     def convert_to_facts(self, keep_import_reactions, use_topological_injections):
@@ -103,7 +111,7 @@ class Reaction:
         rev_upper = -self.lbound
         lower = round(float(0),10)
         facts = ""
-        if self.reversible:
+        if self.reversible or (not self.reversible and self.has_rm_prefix):
             # When the reaction is reversible, the reaction is splitted
             # Create 2 different reactions going in one way for reversible reaction  
             # Cases : [-1000, 1000] | [-8, 1000] | [-1000, 8]
@@ -174,18 +182,14 @@ class Reaction:
             facts += f'exchange("{name}").\n'
         
         prefix=""
-        if not keep_import_reactions and is_import_reaction:
+        # hes rm prefix is True only when an import reaction has been deleted from network but we need to keep
+        # a trace of bondaries into asp fact, the rm_ prefix is needed for the reverse of the remaning reactions
+        if not keep_import_reactions and (is_import_reaction or (self.has_rm_prefix and is_reversed)):
             prefix = "rm_"
             logger.log.info(f"Reaction {self.name} artificially removed into lp facts with a prefix 'rm_'")
 
         facts += f'{prefix}reaction("{name}").\n'
-        
-        
-    
         facts += f'{prefix}bounds("{name}","{"{:.10f}".format(lbound)}","{"{:.10f}".format(ubound)}").\n'
-        
-        if self.is_transport:
-            facts +=  f'{prefix}transport("{prefix}{name}","{reactants[0].name}","{products[0].name}").\n'
 
 
         for metabolite in reactants:
@@ -193,9 +197,11 @@ class Reaction:
 
         for metabolite in products:
             facts += metabolite.convert_to_facts(f"{prefix}product", name)
-            # comme reversible, appelé 2 fois, donc suffit pour uniquement les produits
+            # Because of reversibility it is called 2 time
+            # Only necessary to do this for products
             if use_topological_injections and is_import_reaction:  # this reaction is a generator of seed
                 facts += metabolite.convert_to_facts("seed")
 
         return facts
+
     ########################################################

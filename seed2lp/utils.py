@@ -58,7 +58,7 @@ def get_ids_from_file(fname:str, asp_atome_type:str=None) -> [str]:
     return metabolit_list
     
     
-def get_targets_from_file(fname:str) -> [str]:
+def get_targets_from_file(fname:str):
     """Get metabolites id or reactions id from target file
 
     Args:
@@ -72,7 +72,7 @@ def get_targets_from_file(fname:str) -> [str]:
     Returns:
         [str],[str]: List of target and list of objective reaction
     """
-
+    # TODO: review for community (species)
     target_list=list()
     objective_reaction_list = list()
     ext = os.path.splitext(fname)[1]

@@ -178,6 +178,7 @@ def get_model_data(model:dict, objectives:list=None):
     seeds_list=list()
     seeds_accu_list=list()
     for answer in model['Value']:
+
         if 'seed("' in answer:
             seed=answer.replace('seed("','',1).replace('")','',1)
             seed=seed.split(',')[0].replace('"','',2)
@@ -223,7 +224,7 @@ def print_data(model_number:int, objective_str:str, seeds_list:list,
     if nb_seed_accu>=2:
         plural_accu="s"
     #is_accu = seeds_accu_str or seeds_accu_str != ""
-    print(f"Answer: {model_number} ({nb_seed} seed{plural_seed}) ")
+    print(color.cyan_light + f"Answer: {model_number}{color.reset} ({nb_seed} seed{plural_seed}) ")
     seeds_str = ', '.join(map(str, seeds_list))
     print(seeds_str)
     if nb_seed_accu > 0:

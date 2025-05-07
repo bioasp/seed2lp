@@ -3,7 +3,8 @@ from cobra.core import Model
 
 class Resmod:
     def __init__(self, name:str, objectives:list, solver_type:str, search_mode:str, search_type:str,
-                 size:int, seeds_list:list, flux_lp:dict, flux_cobra:float=None, run_mode:str=None, accu:bool=False):
+                 size:int, seeds_list:list, flux_lp:dict, flux_cobra:dict=None, run_mode:str=None, 
+                 accu:bool=False, is_community:bool=False, transferred_list:list=None):
         """Initialize Object Resmod
 
         Args:
@@ -37,11 +38,13 @@ class Resmod:
         self.run_mode = run_mode
         self.accu = accu
         self.flux_cobra = flux_cobra
+        self.is_community = is_community
+        self.transferred_list = transferred_list
 
 
    
     ######################## METHODS ########################
-    def check_flux(self, model_cobra:Model, try_demands:bool=True):
+    def check_flux(self, model_cobra:Model, try_demands:bool=True, equality_flux:bool=False):
         """Execute flux calculation usng cobra and store data
 
         Args:
@@ -50,10 +53,13 @@ class Resmod:
                                             Defaults to True. False for hybrid with cobra.
             try_demands (bool, optional): Option to try to add demands if seeds failed.
                                          Defaults to True. False for hybrid with cobra.
+            equality_flux (bool, optional): Community mode otpion to force equality of flux 
+                                            between species' biomass
         """
         with model_cobra as m:
             flux_output, objective, lp_flux = \
-                        flux.calculate(m, self.objectives, self.seeds_list, self.flux_lp, try_demands)
+                        flux.calculate(m, self.objectives, self.seeds_list, self.flux_lp, try_demands, 
+                                       self.is_community, self.transferred_list, equality_flux)
         if flux_output:
             self.tested_objective = objective
             self.chosen_lp = lp_flux

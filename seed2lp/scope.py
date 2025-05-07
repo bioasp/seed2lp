@@ -2,7 +2,7 @@ from .network import Network
 from menetools import run_menescope
 from .file import is_valid_dir, save
 from os.path import join
-from .sbml import get_used_metabolites
+#from .sbml import get_used_metabolites
 import libsbml
 from padmet.utils.sbmlPlugin import convert_from_coded_id
 from padmet.utils.connection import sbmlGenerator
@@ -30,7 +30,9 @@ class Scope:
         Creates an intermediate seed sbml file.
         """
         # Get global data on the network
-        set_used_metabolites = get_used_metabolites(self.file)
+        #set_used_metabolites = get_used_metabolites(self.file, True)
+        set_used_metabolites = set(self.network.used_meta.keys())
+
 
         # run the scope for each solutions of the result
         for result in self.network.result_seeds:

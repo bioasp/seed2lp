@@ -13,6 +13,25 @@ LICENSE = """
               Version 3, 29 June 2007
  """
 
+DICT_CHECK = {"--verbose" : "-v",
+                    "--mode" : "-m",
+                    "--community_mode" : "-cm",
+                    "--solve" : "-so",
+                    "--intersection" : "-i",
+                    "--union" : "-u",
+                    "--targets-as-seeds" : "-tas",
+                    "--topological-injection" : "-ti",
+                    "--keep-import-reactions" : "-kir",
+                    "--check-flux" : "-cf",
+                    "--maximize-flux" : "-max",
+                    "--equality-flux" : "-ef",
+                    "--clingo-configuration" : "-cc",
+                    "--clingo-strategy" : "-cs",
+                    "--time-limit" : "-tl",
+                    "--number-solution" : "-nbs",
+                    "--temp" : "-tmp",
+                    "--accumulation" : "-accu"}
+
 ############################################################
 ##################### COMMAND PARSER #######################
 ############################################################
@@ -46,6 +65,18 @@ def cli_parser() -> argparse.ArgumentParser:
         help="SBML or ASP file containing the graph data.",
         type=existant_path
     )
+    pp_community = argparse.ArgumentParser(add_help=False)
+    pp_community.add_argument(
+        dest="comfile",
+        help="Text file contianing name of species.",
+        type=existant_path
+    )
+    pp_sbml_dir = argparse.ArgumentParser(add_help=False)
+    pp_sbml_dir.add_argument(
+        dest="sbmldir", 
+        type=existant_path, default=None,
+        help="Directory containing all SBML File."
+    )
     # Calculate flux
     pp_result = argparse.ArgumentParser(add_help=False)
     pp_result.add_argument(
@@ -60,6 +91,8 @@ def cli_parser() -> argparse.ArgumentParser:
         help="Output directory path",
         type=is_valid_dir
     )
+    
+
 
     #--------------------- PARSERS -------------------------
     
@@ -101,6 +134,13 @@ def cli_parser() -> argparse.ArgumentParser:
         help="objective reaction to activate in the graph",
         required=False
     )
+    pp_forbidden_transfers_file = argparse.ArgumentParser(add_help=False)
+    pp_forbidden_transfers_file.add_argument(
+        '-ftf', '--forbidden-transfers-file', dest="forbidden_transfers_file", 
+        type=existant_path, default=None,
+        help="file containing one forbidden transfer per line",
+        required=False
+    )
 
     #-------------------------------------------------------
     #                      Set mode
@@ -128,6 +168,19 @@ def cli_parser() -> argparse.ArgumentParser:
                - all : Compute reasoning then hybrid then fba",
         required=False
     )  
+    pp_solve_com = argparse.ArgumentParser(add_help=False, formatter_class=argparse.RawTextHelpFormatter)
+    pp_solve_com.add_argument(
+        '-so', '--solve', dest="solve", 
+        type=str, default='reasoning',  choices=['reasoning', 'filter', 'guess_check', 'guess_check_div'], 
+        help="Select the solving mode\n \
+               - reasoning : Only reasoning, no linear calcul \n \
+               - hybrid : Reasoning and linar calcul\n \
+               - guess_check : Only reasoning with guess and check results using cobra (adapts rules) \n \
+               - guess_check_div : Only reasoning with guess and check results using cobra (adapts rules) and add diversity \n \
+               - filter : Only reasoning with a cobra filter validation during search (do not adapt rules)  \n \
+               - all : Compute reasoning then hybrid then fba",
+        required=False
+    )
     pp_intersection = argparse.ArgumentParser(add_help=False)
     pp_intersection.add_argument(
         '-i', '--intersection', dest="intersection", 
@@ -142,6 +195,55 @@ def cli_parser() -> argparse.ArgumentParser:
         help="Compute union of solutions",
         required=False
     )
+
+    #-------------------------------------------------------
+    #                Community options
+    #-------------------------------------------------------
+    pp_com_mode = argparse.ArgumentParser(add_help=False, formatter_class=argparse.RawTextHelpFormatter)
+    pp_com_mode.add_argument(
+        '-cm', '--community_mode', dest="community_mode", 
+        type=str, default='bisteps',  choices=['bisteps', 'global', 'delsupset'], 
+        help="""Choose a mode for computing solutions (default bisteps): \n \
+               - bisteps : First subset minimal on seeds then subset minimal on transfers\n \
+               - global : subset minimal on union seeds and transfers \n \
+               - delsupset : Delete superset of solutions """,
+        required=False
+    )
+    pp_del_supset_mode = argparse.ArgumentParser(add_help=False, formatter_class=argparse.RawTextHelpFormatter)
+    pp_del_supset_mode.add_argument(
+        '-pd', '--partial_delete_superset', dest="partial_delete_superset", 
+        action='store_true',
+        help="""For delete superset mode, the post filter with pyhton is not executed, only a delete sueperset
+        via ASP is done. That's implies some solution founded before can be supserset on seeds of other solutions""",
+        required=False
+    )
+    pp_all_transfers = argparse.ArgumentParser(add_help=False, formatter_class=argparse.RawTextHelpFormatter)
+    pp_all_transfers.add_argument(
+        '-at', '--all_transfers', dest="all_transfers", 
+        action='store_true',
+        help="""For bistesps mode and delete superset mode. 
+        Allows to find all exchanged of one set of seeds solutions and not only the first one before 
+        finding the next set of seeds solutions. This may give less different set of seeds. 
+        """,
+        required=False
+    )
+    pp_not_shown_transfers = argparse.ArgumentParser(add_help=False, formatter_class=argparse.RawTextHelpFormatter)
+    pp_not_shown_transfers.add_argument(
+        '-nst', '--not_shown_transfers', dest="not_shown_transfers", 
+        action='store_true',
+        help="""Do global method or delete superset methods without showing transfers
+        """,
+        required=False
+    )
+    pp_limit_transfers = argparse.ArgumentParser(add_help=False, formatter_class=argparse.RawTextHelpFormatter)
+    pp_limit_transfers.add_argument(
+        '-lt', '--limit_transfers', dest="limit_transfers", 
+        type=int, default=-1,
+        help="""Limit the maximum number of transfers in set. By default -1, meaning no limit.
+        """,
+        required=False
+    )
+
 
     #-------------------------------------------------------
     #               Set of seed restrictions
@@ -191,6 +293,22 @@ def cli_parser() -> argparse.ArgumentParser:
         '-max', '--maximize-flux', dest="maximize_flux", 
         action='store_true',
         help="Maximize the flux of objective reaction",
+        required=False
+    )
+    pp_com_equality_flux = argparse.ArgumentParser(add_help=False)
+    pp_com_equality_flux.add_argument(
+        '-ef', '--equality-flux', dest="equality_flux", 
+        action='store_true',
+        help="""Forces flux equality between species biomass in community using cobra.py 
+            while check_flux is used or while sovling in Filter, Guess-Check or Guess-Check with Diversity modes.
+            If not used, the tool ensures a minimum flux into species biomass.""",
+        required=False
+    )
+    pp_check_flux_parallel = argparse.ArgumentParser(add_help=False)
+    pp_check_flux_parallel.add_argument(
+        '-fp', '--flux-parallel', dest="flux_parallel", 
+        type=int, default=-1,
+        help="""Parallelise check flux.""",
         required=False
     )
 
@@ -326,7 +444,7 @@ def cli_parser() -> argparse.ArgumentParser:
           - hybrid: First uses Network Expansion then calculate FBA constraints with clingo-lpx
         """,
         usage="""
-        seed2lp target network_file  output_dir \n 
+        seed2lp target network_file output_dir \n 
         """
     )
 
@@ -414,7 +532,7 @@ def cli_parser() -> argparse.ArgumentParser:
         "flux",
         help="Calculate cobra flux from seed2lp result file, using sbml file",
         parents=[
-            pp_verbose, pp_network, pp_result, pp_output_dir
+            pp_verbose, pp_network, pp_result, pp_output_dir, pp_check_flux_parallel
         ],
         description=
         """
@@ -428,7 +546,7 @@ def cli_parser() -> argparse.ArgumentParser:
 
     subparsers.add_parser(
         "scope",
-        help="From seeds determine scope of the network.",
+        help="From seeds determine scope of the network. ",
         parents=[
             pp_verbose, pp_network, pp_result, pp_output_dir, pp_temp
         ],
@@ -476,6 +594,70 @@ def cli_parser() -> argparse.ArgumentParser:
         """
     )
 
+    subparsers.add_parser(
+        "community",
+        help="Run seeds detection for a comunity of species ",
+        parents=[
+            pp_verbose, 
+            pp_community, pp_sbml_dir,
+            pp_output_dir,
+            pp_targets_file, 
+            pp_seeds_file, 
+            pp_possible_seeds_file, 
+            pp_forbidden_seeds_file, pp_forbidden_transfers_file,
+            pp_com_mode, pp_solve_com, pp_intersection, pp_union,
+            pp_targets_as_seeds, pp_topological_injection, pp_keep_import_reactions, 
+            pp_clingo_configuration, pp_clingo_strategy, pp_time_limit, pp_number_solution, 
+            pp_instance, pp_temp, pp_check_flux, pp_com_equality_flux,
+            pp_del_supset_mode, pp_all_transfers,
+            pp_config, pp_accumulation,
+            pp_not_shown_transfers, pp_limit_transfers
+        ],
+        #TODO: Target file ? changing objective ? transfers forbidden file ?
+        description=
+        """
+        Seed Searching mode adapted to comunity focusing on reachability of targetted metabolites.
+        The targetted metabolites are reactants of each objective reaction by GSMN.
+        Multiple solving mode (-so/--solve) are available:
+          - reasoning: Only focus in reachability of metabolites using Network Expanion
+          - filter: First uses Network Expanion, then check the flux with COBRApy inferred by seeds
+          - guess_check: Uses Network Expanion, check flux with COBRApy and return results to solver to dismiss superset of results
+          - guess_check_div: Guess check but also forbids subset of seed as next result in order to reduce intersection of solutions
+        """,
+        usage="""
+        seed2lp community_file_text sbml_directory result directory \n 
+        """
+    )
+
+    subparsers.add_parser(
+        "fluxcom",
+        help="Calculate cobra flux from seed2lp result file, using a community file and sbml directory",
+        parents=[
+            pp_verbose,
+            pp_community, pp_sbml_dir,
+            pp_result, pp_output_dir, pp_com_equality_flux,
+            pp_config, pp_temp, pp_check_flux_parallel
+        ],
+        description=
+        """
+        From Seed2lp seed searching results json file, this functionnality calculate fluxes inferred by seeds for all models for the community using COBRApy.
+        Can be used for other tool results if the results file has the same json structure.
+        """,
+        usage="""
+        seed2lp fluxcom community_file_text sbml_directory seed2lp_result_file output_directory \n 
+        """
+    )
+
+
+    #-------------------------------------------------------
+    #                Commands commposition
+    #-------------------------------------------------------
+    #sub_community.add_argument(
+    #dest="sbmldir", 
+    #type=existant_path, default=None,
+    #help="Directory containing all SBML File."
+    #)
+
     return parser
 
 def parse_args(args: iter = None) -> dict:
@@ -484,25 +666,29 @@ def parse_args(args: iter = None) -> dict:
 
 ####################### FUNCTIONS ##########################
 
+def review_conf(conf_argparse:dict, cfg:dict):
+    """Review the configuration from congif file with argument given by user
+
+    Args:
+        conf_argparse (dict): Configuration for argument
+        cfg (dict): Configuration from config file
+
+    Returns:
+        dict: cfg
+    """
+    for key, value in conf_argparse.items():
+        if key not in cfg:
+            cfg[key] = value
+        else:
+            for long , short in DICT_CHECK.items():
+                if long in argv or short in argv:
+                    long = long.lstrip("-")
+                    long = long.replace("-","_")
+                    cfg[long] = conf_argparse[long] 
+    return cfg
+
 
 def get_config(args:argparse.Namespace, project_source):
-    dict_check = {"--verbose" : "-v",
-                    "--mode" : "-m",
-                    "--solve" : "-so",
-                    "--intersection" : "-i",
-                    "--union" : "-u",
-                    "--targets-as-seeds" : "-tas",
-                    "--topological-injection" : "-ti",
-                    "--keep-import-reactions" : "-kir",
-                    "--check-flux" : "-cf",
-                    "--maximize-flux" : "-max",
-                    "--clingo-configuration" : "-cc",
-                    "--clingo-strategy" : "-cs",
-                    "--time-limit" : "-tl",
-                    "--number-solution" : "-nbs",
-                    "--temp" : "-tmp",
-                    "--accumulation" : "-accu"}
-    
     conf_argparse = vars(args)
     conf_file=None
     # Get config file path
@@ -521,15 +707,12 @@ def get_config(args:argparse.Namespace, project_source):
     # Overwrite configs with cli argument
     match args.cmd:
         case "target" | "full" | "fba":
-            for key, value in conf_argparse.items():
-                cfg = cfg_file['seed2lp']
-                if key not in cfg:
-                    cfg[key] = value
-                else:
-                    for long , short in dict_check.items():
-                        if long in argv or short in argv:
-                            long = long.lstrip("-")
-                            long = long.replace("-","_")
-                            cfg[long] = conf_argparse[long]           
-
+            cfg = cfg_file['seed2lp']
+            cfg = review_conf(conf_argparse, cfg)
+        case "community":
+            cfg = cfg_file['seed2lp_com']
+            cfg = review_conf(conf_argparse, cfg)
+        case "fluxcom":
+            cfg = cfg_file['flux_com']
+            cfg = review_conf(conf_argparse, cfg)
     return cfg

@@ -5,7 +5,7 @@ setup(
     name='seed2lp',
     version=__version__,
     description='Seed searching from network as SBML using Logic programming',
-      url='http://github.com/*/*',
+      url='http://github.com/bioasp/seed2lp',
       author='Chabname Ghassemi Nedjad',
       author_email='chabname.ghassemi-nedjad@inria.fr',
       license='GPL',
