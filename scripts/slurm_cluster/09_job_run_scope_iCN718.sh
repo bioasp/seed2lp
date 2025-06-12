@@ -20,6 +20,7 @@ RESULT_DIR="../../analyses/results"
 SOLUTION_DIR="$RESULT_DIR/iCN718"
 SCOPE_DIR="$RESULT_DIR/scopes_iCN718"
 $SPECIES="iCN718"
+TOOL="SEED2LP"
 
 
-./09_run_scope.sh -i $SOLUTION_DIR -s $SCOPE_DIR -n $NORM_SBML_DIR -b $SPECIES
+./09_run_scope.sh -i $SOLUTION_DIR -s $SCOPE_DIR -n $NORM_SBML_DIR -t $TOOL -b $SPECIES

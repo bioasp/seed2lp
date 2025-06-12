@@ -1,7 +1,7 @@
 #!/bin/bash
-#SBATCH --job-name=job_netseed         # Job name
-#SBATCH --output=../output/netseed/netseed-%A_%a.out
-#SBATCH -e ../error/netseed/netseed-%A_%a.err
+#SBATCH --job-name=job_precursor         # Job name
+#SBATCH --output=../output/precursor/precursor-%A_%a.out
+#SBATCH -e ../error/precursor/precursor-%A_%a.err
 #SBATCH -c 1                                        #Number of cores
 #SBATCH --nodes=1                                   #Number of nodes    
 #SBATCH --cpus-per-task=1                          #Request that ncpus be allocated per process.
@@ -21,5 +21,7 @@ NORM_SBML_DIR="${DATA_DIR}/sbml_corrected"
 N2PCOMP_DIR="../../N2PComp"
 PRECURSOR_RESULT_DIR="../../analyses/results/precursor"
 TOOL="PRECURSOR"
+TARGET_DIR="${DATA_DIR}/target"
 
-./05_1_run_n2pcom.sh -d $DATA_DIR -i $NORM_SBML_DIR  -n $N2PCOMP_DIR -r $PRECURSOR_RESULT_DIR -t $TOOL
+./05_1_run_n2pcom.sh -d $DATA_DIR -i $NORM_SBML_DIR  -n $N2PCOMP_DIR -r $PRECURSOR_RESULT_DIR -t $TOOL -d $TARGET_DIR
+

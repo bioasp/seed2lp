@@ -1,12 +1,13 @@
 #!/bin/bash
 
 # Get arguments
-while getopts i:s:n:b: flag
+while getopts i:s:n:t:b: flag
 do
     case "${flag}" in
         i) SOLUTION_DIR=${OPTARG};;
         s) SCOPE_DIR=${OPTARG};;
         n) NORM_SBML_DIR=${OPTARG};;
+        t) TOOL=${OPTARG};;
         b)
           if [[ ! -z ${OPTARG} ]]; then
               SPECIES=${OPTARG}
@@ -28,15 +29,23 @@ else
 fi
 
 
-SPECIES_SOLUTION_DIR="$SOLUTION_DIR/$CURRENT_SPECIES/"
-
 FULL_PATH=$SCOPE_DIR/$CURRENT_SPECIES
 if [[ ! -d "$FULL_PATH" ]]
 then
   mkdir -p "$FULL_PATH"
 fi
 
-for solution_file in "$SPECIES_SOLUTION_DIR"/*results.json
-do
+
+if [[ "$TOOL" = "NETSEED" ]]
+then
+  solution_file="$SOLUTION_DIR"/"$CURRENT_SPECIES"_netseed_results.json
   seed2lp scope "$NORM_SBML_DIR/$CURRENT_SBML_FILE" $solution_file $FULL_PATH
-done
+else 
+  SPECIES_SOLUTION_DIR="$SOLUTION_DIR/$CURRENT_SPECIES/"
+  for solution_file in "$SPECIES_SOLUTION_DIR"/*results.json
+  do
+    seed2lp scope "$NORM_SBML_DIR/$CURRENT_SBML_FILE" $solution_file $FULL_PATH
+  done
+fi
+
+

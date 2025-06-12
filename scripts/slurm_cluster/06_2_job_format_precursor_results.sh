@@ -1,7 +1,7 @@
 #!/bin/bash
-#SBATCH --job-name=job_netseed         # Job name
-#SBATCH --output=../output/netseed/netseed-%A_%a.out
-#SBATCH -e ../error/netseed/netseed-%A_%a.err
+#SBATCH --job-name=job_precursor         # Job name
+#SBATCH --output=../output/precursor/precursor-%A_%a.out
+#SBATCH -e ../error/precursor/precursor-%A_%a.err
 #SBATCH --cpus-per-task=1                          #Request that ncpus be allocated per process.
 #SBATCH --ntasks-per-node=1                         #Number of tasks per node
 #SBATCH --time=24:00:00                 # Time limit hrs:min:sec
@@ -22,4 +22,4 @@ NETSEED_RESULT_DIR="${RESULT_DIR}/precursor"
 NETSEED_FORM_RESULT_DIR="${RESULT_DIR}/precursor_formated_results"
 TOOL="PRECURSOR"
 
-./05_2_results.sh -i $NETSEED_RESULT_DIR -r $NETSEED_FORM_RESULT_DIR -o $OBJECTIVE_DIR -s $SBML_DIR $TOOL
+./05_2_format_results.sh -i $NETSEED_RESULT_DIR -r $NETSEED_FORM_RESULT_DIR -o $OBJECTIVE_DIR -s $SBML_DIR -t $TOOL

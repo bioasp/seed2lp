@@ -19,7 +19,8 @@ NORM_SBML_DIR="${DATA_DIR}/sbml_corrected"
 RESULT_DIR="../../analyses/results"
 SOLUTION_DIR="$RESULT_DIR/netseed_formated_results"
 SCOPE_DIR="$RESULT_DIR/scopes_netseed"
+TOOL="NETSEED"
 
 
 
-./09_run_scope.sh -i $SOLUTION_DIR -s $SCOPE_DIR -n $NORM_SBML_DIR
+./09_run_scope.sh -i $SOLUTION_DIR -s $SCOPE_DIR -n $NORM_SBML_DIR -t $TOOL

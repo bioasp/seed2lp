@@ -28,11 +28,6 @@ then
   CONF_PATH="${N2PCOMP_DIR}/config_netseed.yaml"
 else
   CONF_PATH="${N2PCOMP_DIR}/config_precursor.yaml"
-  # Create directories if needed
-  if [[ ! -d "$TARGET_DIR" ]]
-  then
-    mkdir -p "$TARGET_DIR"
-  fi
 fi
 
 # Create directories if needed
@@ -66,18 +61,14 @@ do
       mkdir -p "$RESULT_DIR/$CURRENT_SPECIES/target"
     fi
 
-    #Split Array
-    python seed2lp $file $TARGET_DIR -o $OBJECTIVE
-
-
     python -m n2pcomp run $file \
     --output "${RESULT_DIR}/$CURRENT_SPECIES/target" \
-    -c $CONF_FILE -nbs 1000 -tl 45 \
+    -c $CONF_PATH -nbs 1000 -tl 45 \
     -t "$TARGET_DIR/${CURRENT_SPECIES}_targets.txt"
 
     python -m n2pcomp run $file \
     --output "${RESULT_DIR}/$CURRENT_SPECIES/full_network" \
-    -c $CONF_FILE -nbs 1000 -tl 45
+    -c $CONF_PATH -nbs 1000 -tl 45
   fi
 
 done

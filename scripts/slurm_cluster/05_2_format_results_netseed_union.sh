@@ -17,7 +17,7 @@ done
 SPECIES=$(ls "$RESULT_DIR" | head -n "$SLURM_ARRAY_TASK_ID" | tail -n 1)
 OBJECTIVE=$(head -n 1 $OBJECTIVES_DIR/${SPECIES}_target.txt)
 
-PYTHON_FILE="../05_format_results.py"
+PYTHON_FILE="../05_format_results_netseed_union.py"
 
 # Create directories if needed
 if [[ ! -d "$FORM_RESULT_DIR" ]]
@@ -27,7 +27,7 @@ fi
 
 if [[ "$TOOL" = "NETSEED" ]]
 then
-    RESULT_FILE="$RESULT_DIR/$SPECIES/results.json"
+    RESULT_FILE="$RESULT_DIR/$SPECIES/netseed/results.json"
     FORM_RESULT_FILE="$FORM_RESULT_DIR/${SPECIES}_netseed_results.json"
     python $PYTHON_FILE $RESULT_FILE $SPECIES $OBJECTIVE $FORM_RESULT_FILE $TOOL
     seed2lp flux "$SBML_DIR/${SPECIES}.xml" $FORM_RESULT_FILE $FORM_RESULT_DIR
