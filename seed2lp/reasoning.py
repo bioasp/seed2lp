@@ -359,8 +359,6 @@ class Reasoning(HybridReasoning):
             # FILTER OR GUESS-CHECK mode
             #TODO redo intersection and union mode
             case _, "filter"| "guess_check" | "guess_check_div":
-                   print("##############################")
-                   print("FILTER OR GUESS-CHECK")
                    time_solve, time_ground, solution_list, number_rejected = self.solve_hybrid(step, full_option, asp_files, search_mode, is_one_model)
 
         #TODO: Intersection and union not needed with filter and guess check but 

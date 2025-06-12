@@ -418,7 +418,6 @@ class HybridReasoning(Solver):
         if step == "filter":
             suffix = " FILTER"
             full_path = path.join(self.temp_dir,f"{self.temp_result_file}.tsv")
-            print(full_path)
             p = Process(target=self.filter, args=(queue, full_option, asp_files, search_mode, full_path, is_one_model))
         elif "guess_check" in step:
             suffix = " GUESS-CHECK"
@@ -541,8 +540,6 @@ class HybridReasoning(Solver):
         solution_idx = 1
         number_rejected = 0
         start_time=time()
-        print("#######################")
-        print("STARTS FIND SOLUTION CLINGO")
         with ctrl.solve(yield_=True) as h:
             for model in h:
                 if (len(solution_list) < self.number_solution \
@@ -554,7 +551,6 @@ class HybridReasoning(Solver):
                     transf_short, trans_complete, trans_solution_list =self.get_transfers_info(transferred)
 
                     if not is_one_model:
-                        print("STARTS CHECK SEEDS")
                         res = self.network.check_seeds(seeds, trans_solution_list)
                         if res[0]:
                             # valid solution
@@ -579,8 +575,6 @@ class HybridReasoning(Solver):
                             if number_rejected%100 == 0 \
                             or (current_timer!=0 and current_timer > self.time_limit_minute*60 - 300):
                                 self.temp_rejected(number_rejected, full_path)
-                        print("HEEEEY")
-                        print(number_rejected)
                     # This means we are in "is_one_model", we are searching for minimize
                     # there is no minimize with community mode
                     else:
