@@ -72,8 +72,8 @@ def get_targets_from_file(fname:str):
     Returns:
         [str],[str]: List of target and list of objective reaction
     """
-    # TODO: review for community (species)
-    target_list=list()
+    # TODO: need a review for community (species)
+    target_list=dict()
     objective_reaction_list = list()
     ext = os.path.splitext(fname)[1]
     if ext in {'.txt', ''}:  # file, one line per metabolite
@@ -81,7 +81,8 @@ def get_targets_from_file(fname:str):
             for line in map(str.strip, fd): # remove white spaces
                 if line:
                     if re.search("^M_*",line):
-                        target_list.append(line)
+                        target_list[line]=line
+                        #target_list.append(line)
                     elif re.search("^R_*",line):
                         objective_reaction_list.append(line)
                     else:

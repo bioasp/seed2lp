@@ -58,8 +58,11 @@ bounds(export_exch_created(M),"0","1000") :- export_exch_created(M,B).
 &dom{L..U} = R :- bounds(R,L,U), reaction(R).
 
 % FBA definition
-&sum{ IS*IR   : product(M,IS,IR,_,_,_);
-    -OS*OR   : reactant(M,OS,OR,_,_,_)
+%OS: Product stoicihiometry bu producting reaction OR
+%IS: Consumed stoichiometry by consuming reaction IR
+
+&sum{ OS*OR   : reactant(M,OS,OR,_,_,_);
+    -IS*IR   : product(M,IS,IR,_,_,_)
     } = 0 :- metabolite(M,_,_,_).
 
 % goal condition: target flux > 0
