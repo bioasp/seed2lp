@@ -201,7 +201,7 @@ class Reasoning(HybridReasoning):
         if not self.optimum_found:
             return
         
-        if self.optimum == 0:
+        if self.optimum == 0 or self.optimum == (0,0): # without or with possible seeds file
             opti_message = "Optimum is 0."
 
         ok_opti = self.optimum_found and (self.opt_size > 0)
@@ -313,7 +313,10 @@ class Reasoning(HybridReasoning):
                         if one_model.get('seed'):
                             self.optimum = opt
                         else:
-                            self.optimum = 0
+                            if self.network.possible_seeds:
+                                self.optimum = opt
+                            else:
+                                self.optimum = 0
                 if not self.optimum_found:
                     logger.print_log('Optimum not found', "error") 
                 else:
