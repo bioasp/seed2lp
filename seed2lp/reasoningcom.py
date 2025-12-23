@@ -211,7 +211,7 @@ class ComReasoning(Reasoning):
                                 if USE_MULTIPROCESSING and number_rejected%100 == 0 \
                                 or (current_timer!=0 and current_timer > self.time_limit_minute*60 - 300):
                                     self.temp_rejected(number_rejected, full_path)
-                            print(current_timer)
+                            #print(current_timer)
                             current_timer = time() - start_time
                         if keep_solution:
                             message = color.cyan_light  + f"Answer: {idx}{color.reset} ({size_seeds} seeds{transf_short}) \n"

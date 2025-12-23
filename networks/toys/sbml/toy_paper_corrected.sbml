@@ -51,7 +51,7 @@
                     <speciesReference species="M_B_c" stoichiometry="1.0000" />
                 </listOfProducts>
             </reaction>
-            <reaction id="R_R2" name="R_R2" reversible="false" fbc:upperFluxBound="cobra_0_bound" fbc:lowerFluxBound="cobra_0_bound">
+            <!-- <reaction id="R_R2" name="R_R2" reversible="false" fbc:upperFluxBound="cobra_0_bound" fbc:lowerFluxBound="cobra_0_bound">
                 <listOfReactants>
                     <speciesReference species="M_A_c" stoichiometry="1.0000" />
                     <speciesReference species="M_J_c" stoichiometry="1.0000" />
@@ -59,7 +59,7 @@
                 <listOfProducts>
                     <speciesReference species="M_C_c" stoichiometry="1.0000" />
                 </listOfProducts>
-            </reaction>
+            </reaction> -->
             <reaction id="R_R3" name="R_R3" reversible="false" fbc:upperFluxBound="cobra_default_ub" fbc:lowerFluxBound="cobra_0_bound">
                 <listOfReactants>
                     <speciesReference species="M_S2_e" stoichiometry="1.0000" />
@@ -75,7 +75,7 @@
                     <speciesReference species="M_E_c" stoichiometry="1.0000" />
                 </listOfReactants>
                 <listOfProducts>
-                    <speciesReference species="M_F_c" stoichiometry="2.0000" />
+                    <speciesReference species="M_F_c" stoichiometry="1.0000" />
                 </listOfProducts>
             </reaction>
             <reaction id="R_BIOMASS" name="R_BIOMASS" reversible="true" fbc:upperFluxBound="cobra_default_ub" fbc:lowerFluxBound="cobra_0_bound">
@@ -102,12 +102,12 @@
                     <speciesReference species="M_H_c" stoichiometry="1.0000" />
                 </listOfProducts>
             </reaction>
-            <reaction id="R_R7" name="R_R7" reversible="false" fbc:upperFluxBound="cobra_0_bound" fbc:lowerFluxBound="cobra_default_lb">
+            <reaction id="R_R7" name="R_R7" reversible="false" fbc:upperFluxBound="cobra_default_ub" fbc:lowerFluxBound="cobra_0_bound">
                 <listOfReactants>
-                    <speciesReference species="M_E_c" stoichiometry="1.0000" />
+                    <speciesReference species="M_H_c" stoichiometry="1.0000" />
                 </listOfReactants>
                 <listOfProducts>
-                    <speciesReference species="M_H_c" stoichiometry="1.0000" />
+                    <speciesReference species="M_E_c" stoichiometry="1.0000" />
                 </listOfProducts>
             </reaction>
             <reaction id="R_EX_S1" name="R_EX_S1" reversible="true" fbc:upperFluxBound="cobra_default_ub" fbc:lowerFluxBound="cobra_default_lb">

@@ -174,7 +174,6 @@ def cli_parser() -> argparse.ArgumentParser:
         type=str, default='reasoning',  choices=['reasoning', 'filter', 'guess_check', 'guess_check_div'], 
         help="Select the solving mode\n \
                - reasoning : Only reasoning, no linear calcul \n \
-               - hybrid : Reasoning and linar calcul\n \
                - guess_check : Only reasoning with guess and check results using cobra (adapts rules) \n \
                - guess_check_div : Only reasoning with guess and check results using cobra (adapts rules) and add diversity \n \
                - filter : Only reasoning with a cobra filter validation during search (do not adapt rules)  \n \
@@ -339,8 +338,8 @@ def cli_parser() -> argparse.ArgumentParser:
     pp_number_solution = argparse.ArgumentParser(add_help=False)
     pp_number_solution.add_argument(
         '-nbs', '--number-solution', dest="number_solution", 
-        type=int, default=-1,
-        help="Change the number of solution limit. By default:-1. \
+        type=int, default=10,
+        help="Change the number of solution limit. By default:10. \
              \n0 solution means no limit. \
              \n-1 means no enumeration",
         required=False
@@ -444,7 +443,7 @@ def cli_parser() -> argparse.ArgumentParser:
           - hybrid: First uses Network Expansion then calculate FBA constraints with clingo-lpx
         """,
         usage="""
-        seed2lp target network_file output_dir \n 
+        seed2lp target [network_file] [output_dir] \n 
         """
     )
 
@@ -476,7 +475,7 @@ def cli_parser() -> argparse.ArgumentParser:
           - hybrid: First uses Network Expansion then calculate FBA constraints with clingo-lpx
         """,
         usage="""
-        seed2lp full network_file output_dir \n 
+        seed2lp full [network_file] [output_dir] \n 
         """
     )
 
@@ -502,7 +501,7 @@ def cli_parser() -> argparse.ArgumentParser:
         It is possible to change the objective reaction by using the option -o/--objective for flux checking.
         """,
         usage="""
-        seed2lp fba network_file  \n 
+        seed2lp fba [network_file] [output_dir] \n 
         """
     )
     
@@ -625,7 +624,7 @@ def cli_parser() -> argparse.ArgumentParser:
           - guess_check_div: Guess check but also forbids subset of seed as next result in order to reduce intersection of solutions
         """,
         usage="""
-        seed2lp community_file_text sbml_directory result directory \n 
+        seed2lp community community_file_text sbml_directory result directory \n 
         """
     )
 

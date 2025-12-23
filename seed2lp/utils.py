@@ -4,6 +4,7 @@ import clyngor
 import re
 from re import findall
 from . import logger
+from csv import reader
 
 
 def solve(*args, **kwargs):
@@ -58,11 +59,12 @@ def get_ids_from_file(fname:str, asp_atome_type:str=None) -> [str]:
     return metabolit_list
     
     
-def get_targets_from_file(fname:str):
+def get_targets_from_file(fname:str, is_community:bool):
     """Get metabolites id or reactions id from target file
 
     Args:
         fname (str): Target file path
+        is_community (bool): Community mode
 
     Raises:
         ValueError: The element [element] misses prefix M_ or R_"
@@ -72,26 +74,53 @@ def get_targets_from_file(fname:str):
     Returns:
         [str],[str]: List of target and list of objective reaction
     """
-    # TODO: need a review for community (species)
     target_list=dict()
     objective_reaction_list = list()
     ext = os.path.splitext(fname)[1]
-    if ext in {'.txt', ''}:  # file, one line per metabolite
-        with open(fname) as fd:
-            for line in map(str.strip, fd): # remove white spaces
-                if line:
-                    if re.search("^M_*",line):
-                        target_list[line]=line
-                        #target_list.append(line)
-                    elif re.search("^R_*",line):
-                        objective_reaction_list.append(line)
+    if ext in {'.txt',  ".csv",''}:  # file, one line per metabolite
+        # file = open(fname)
+        # tgts = reader(file, delimiter='\t')
+        with open(fname, "r") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue  # ignore empty line
+                data = re.split(r"[ \t]+", line)
+
+                obj_id=data[0]
+                if is_community:
+                    if len(data)==2:
+                        species=data[1]
                     else:
-                        raise ValueError(f"\n{fname} : The element {line} misses prefix M_ or R_")
+                        raise ValueError(f"invalid data, needs 2 elements (metabolite or reaction / species):\n {line}")
+                else:
+                    if len(data)==1:
+                        species=""
+                    else:
+                        raise ValueError(f"invalid data, needs 1 element (metabolite or reaction):\n {line}")
+
+                if re.search("^M_*",line):
+                    prefixed_id=prefix_id_network(is_community, obj_id, species, "metabolite")
+                    if obj_id in target_list:
+                        target_list[obj_id].append(prefixed_id)
+                    else:
+                        target_list[obj_id]=[prefixed_id]
+                    #target_list.append(line)
+                elif re.search("^R_*",line):
+                    objective_reaction_list.append([species, obj_id])
+                else:
+                    raise ValueError(f"\n{fname} : The element {line} misses prefix M_ or R_")
     else:
         raise NotImplementedError(f'\nThe {fname} extension has to be ".txt". Given: {ext}')
     
-    if len(objective_reaction_list) >1 :
-        raise ValueError(f"\nMultiple objective reaction found in {fname}\n") 
+    if len(objective_reaction_list) >1 and not is_community:
+        raise ValueError(f"\nMultiple objective reaction found in {fname}\n")
+    elif is_community:
+        no_duplicates = len({x[0] for x in objective_reaction_list}) == len(objective_reaction_list)
+        if not no_duplicates:
+            raise ValueError(f"\nMultiple objective reaction found in {fname} for same species\n")
+
+
     
     return target_list, objective_reaction_list
 
@@ -182,3 +211,27 @@ def repair_json(json_str:str, is_clingo_lpx:bool=False):
         close_str += "\n" + i * "\t" + close[open]
     logger.log.warning("Output not totally recovered. Json has been repaired but might miss results")
     return output+close_str
+
+def prefix_id_network(is_community:bool, name:str, species:str="", type_element:str=""):
+        """Prefix Reaction or Metbolite by the network name (filename) if the tool is used for community.
+        For single network, nothing is prefixed.
+
+        Args:
+            name (str): ID of the element
+            species (str, optional): Network name (from filename). Defaults to "".
+            type_element: (str, optional): "reaction" or "metabolite" or no type. Defaults to "".
+
+        Returns:
+            str: The name prfixed by the network if needed
+        """
+        match is_community, type_element:
+            case True,"reaction":
+                return re.sub("^R_", f"R_{species}_",name)
+            case True,"metabolite":
+                return re.sub("^M_", f"M_{species}_",name)
+            case True,"metaid":
+                return re.sub("^meta_R_", f"meta_R_{species}_",name)
+            case True,_:
+                return f"{species}_{name}"
+            case _,_:
+                return name

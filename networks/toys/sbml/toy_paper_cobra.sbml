@@ -86,7 +86,7 @@
                     <speciesReference species="M_G_c" stoichiometry="1.0000" />
                 </listOfProducts>
             </reaction>
-            <reaction id="R_R5" name="R_R5" reversible="true" fbc:upperFluxBound="cobra_default_ub" fbc:lowerFluxBound="cobra_10_lbound">
+            <reaction id="R_R5" name="R_R5" reversible="true" fbc:upperFluxBound="cobra_default_ub" fbc:lowerFluxBound="cobra_0_bound">
                 <listOfReactants>
                     <speciesReference species="M_F_c" stoichiometry="1.0000" />
                 </listOfReactants>
