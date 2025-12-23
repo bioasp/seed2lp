@@ -41,9 +41,10 @@ jobs:
        # pip install -r requirements.txt
     - name: Test with pytest
       run: |
+        pip install -e .
         pip install pytest
-        # cd tests
         pytest tests/fba.py
-        pytest tests/full_network.py
-        pytest tests/normalization.py
+        pytest tests/full
+        network.py pytest
+        tests/normalization.py
         pytest tests/target.py
