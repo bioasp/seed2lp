@@ -6,7 +6,7 @@ Description:
 Test seed2lp
 """
 from os import path
-from tests.utils import get_network
+from .utils import get_network
 import re
 
 ##### ###### ##### DIRECTORIES AND FILES ###################
