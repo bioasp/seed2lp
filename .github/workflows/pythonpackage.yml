@@ -44,7 +44,7 @@ jobs:
         pip install -e .
         pip install pytest
         pytest tests/fba.py
-        pytest tests/full
+        pytest tests/full.py
         pytest tests/network.py 
         pytest tests/normalization.py
         pytest tests/target.py
