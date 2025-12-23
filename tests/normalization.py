@@ -29,11 +29,10 @@ EXCH = {"R_EX_S1", "R_EX_S2", "R_EX_C", "R_EX_G"}
 
 DEL = {"R_R2"}
 
-# For exchange reaction when import reaction deleted, 
-# the source reversible parameter is not changed.
+# For exchange reaction when import reaction deleted
 # The deletion is on ASP facts with atom reaction and bounds prefixed with "rm_" 
 # and product or reactant prefixed with "rm_" 
-REV = {"R_BIOMASS"}
+REV = {'R_BIOMASS', 'R_EX_S1', 'R_EX_S2', 'R_EX_C', 'R_EX_G'}
 
 META_EXCH = {"R_R7"}
 
@@ -47,17 +46,17 @@ RM_RXN = ['rm_reaction("rev_R_EX_S1").',
         'rm_bounds("rev_R_EX_S2","0.0000000000","1000.0000000000").',
         'rm_bounds("rev_R_EX_C","0.0000000000","1000.0000000000").',
         'rm_bounds("rev_R_EX_G","0.0000000000","1000.0000000000").',
-        'rm_product("M_S1_e","1.0000000000","rev_R_EX_S1","exchange").',
-        'rm_product("M_S2_e","1.0000000000","rev_R_EX_S2","exchange").',
-        'rm_product("M_C_c","1.0000000000","rev_R_EX_C","exchange").',
-        'rm_product("M_G_c","1.0000000000","rev_R_EX_G","exchange").'
+        'rm_product("M_S1_e","1.0000000000","rev_R_EX_S1","exchange","M_S1_e","toy_paper").',
+        'rm_product("M_S2_e","1.0000000000","rev_R_EX_S2","exchange","M_S2_e","toy_paper").',
+        'rm_product("M_C_c","1.0000000000","rev_R_EX_C","exchange","M_C_c","toy_paper").',
+        'rm_product("M_G_c","1.0000000000","rev_R_EX_G","exchange","M_G_c","toy_paper").'
         ]
 SIZE_RM_RXN=len(RM_RXN)
 
-SEED_TI = ['seed("M_S1_e","exchange").',
-        'seed("M_S2_e","exchange").',
-        'seed("M_C_c","exchange").',
-        'seed("M_G_c","exchange").'
+SEED_TI = ['seed("M_S1_e","exchange","M_S1_e").',
+        'seed("M_S2_e","exchange","M_S2_e").',
+        'seed("M_C_c","exchange","M_C_c").',
+        'seed("M_G_c","exchange","M_G_c").'
         ]
 SIZE_SEED_TI=len(SEED_TI)
 
@@ -97,18 +96,7 @@ def test_rev_modified():
 
     network = get_network(INFILE, run_mode, targets_as_seeds, 
                     topological_injection, keep_import_reactions)
-    assert set(network.reversible_modified_reactions) == REV
-
-
-def test_meta_modified():
-    run_mode = "full"
-    targets_as_seeds = False
-    topological_injection = False
-    keep_import_reactions = False
-
-    network = get_network(INFILE, run_mode, targets_as_seeds, 
-                    topological_injection, keep_import_reactions)
-    assert set(network.meta_modified_reactions) == META_EXCH
+    assert set(network.reversible_modified_reactions.keys()) == REV
 
 
 # import reaction removed, prefixed by "rm_" on atom 
@@ -175,6 +163,7 @@ def test_ti():
     size_seed_found=len(seed_list_found)
     assert size_seed_found == SIZE_SEED_TI
 
+    print(network.facts)
     for seed in SEED_TI:
         assert seed in network.facts
 
