@@ -17,14 +17,13 @@ import os
 import pandas as pd
 from .reaction import Reaction
 import seed2lp.sbml as SBML
-from .utils import quoted
+from .utils import quoted, prefix_id_network
 from . import flux
 from .resmod import Resmod
 from time import time
 from . import color
 from . import logger
 from .file import existant_path
-from re import sub
 import xml.etree.ElementTree as ET
 import copy
 from dataclasses import dataclass
@@ -95,6 +94,7 @@ class NetBase:
         self.fbc=dict()
         self.parameters = dict()
         self.objectives = list()
+        self.objectives_reaction_name = list()
         self.is_objective_error = False
         self.targets=dict()
         self.seeds = list()
@@ -158,8 +158,7 @@ class NetBase:
         reactants = SBML.get_listOfReactants_from_name(self.model[species], ojective_name)
         for reactant in reactants:
             react_name = prefixed_name = reactant.attrib.get('species')
-            if self.is_community:
-                prefixed_name = self.prefix_id_network(react_name, species, "metabolite")
+            prefixed_name = prefix_id_network(self.is_community, react_name, species, "metabolite")
 
             if react_name not in self.targets:
                 self.targets[react_name] = [prefixed_name]
@@ -228,10 +227,13 @@ class NetBase:
             if lbound == 0 and ubound == 0:
                 self.is_objective_error = True
                 raise ValueError(f"Lower and upper boundaries are [0,0] \nfor objetive reaction {obj_found_name}\n")
-            obj_found_id = self.prefix_id_network(obj_found_name, species, "reaction")
-            self.objectives.append(obj_found_id)
+            obj_found_id = prefix_id_network(self.is_community, obj_found_name, species, "reaction")
+            self.objectives.append([species, obj_found_id])
+            self.objectives_reaction_name.append(obj_found_id)
             if (self.run_mode == "target" or self.run_mode == "fba" or self.run_mode == "community")\
               and ('Targets' not in input_dict or not input_dict["Targets"]):
+                if not self.is_community:
+                    species = self.name
                 self.get_objective_reactant(obj_found_name, species)
                 is_reactant_found = True
         return is_reactant_found
@@ -294,30 +296,39 @@ class NetBase:
             # or command line (mode full)
             if is_user_objective:
                 if self.run_mode == "target":
-                    obj_message += "    Objective reaction from target file\n"
+                    obj_message += "-    Objective reaction from target file\n"
                 else:
-                    obj_message += "    Objective reaction from command line\n"
+                    obj_message += "-    Objective reaction from command line\n"
                 suff_plurial=""
                 if len(self.objectives) > 1:
                     suff_plurial = "s"
-                obj_string = " | ".join([str(item) for item in self.objectives])
-                obj_message += f'\n\nObjective{suff_plurial} : {obj_string}'
                 # Reactant of objective set as target on target mode
                 # No needed on full mode (all metabolite are set as target)
                 if self.run_mode != "full":
                     for obj in self.objectives:
-                        self.get_objective_reactant(obj, self.species)
+                        if self.is_community:
+                            species=obj[0]
+                        else:
+                            species = self.name
+                        self.get_objective_reactant(ojective_name=obj[1], species=species)
+                        obj[1]=prefix_id_network(self.is_community, obj[1], obj[0], "reaction")
+                        self.objectives_reaction_name.append(obj[1])
+                    obj_string = " | ".join([str(item[1]) for item in self.objectives])
+                    obj_message += f'        Objective{suff_plurial} : {obj_string}'
                     tgt_message +=  "    Reactant of objective reaction\n    from target file\n"
-        
+                else:
+                    obj_string = " | ".join([str(item[1]) for item in self.objectives])
+                    obj_message += f'\n        Objective{suff_plurial} : {obj_string}'
+
         # Find objective into sbml file if not given by user      
         if not is_user_objective:
             if not objective_error :
-                obj_message += "    Objective reaction from SBML file"
+                obj_message += "-    Objective reaction from SBML file"
                 suff_plurial=""
                 if len(self.objectives) > 1:
                     suff_plurial = "s"
-                obj_string = " | ".join([str(item) for item in self.objectives])
-                obj_message += f'\n\nObjective{suff_plurial} : {obj_string}'
+                obj_string = " | ".join([str(item[1]) for item in self.objectives])
+                obj_message += f'\n        Objective{suff_plurial} : {obj_string}'
                 if self.run_mode != "full" \
                   and is_reactant_found:
                     tgt_message +=  "    Reactant of objective reaction\n    from SBML file\n"
@@ -326,6 +337,22 @@ class NetBase:
                   and (self.targets is None or not self.targets):
                     tgt_message += "    No target found"
                 obj_message += "    No objective reaction found"
+        else:
+            if len(self.objectives)<len(self.species):
+                obj_message += "\n\n-    Objective reaction from SBML file"
+                suff_plurial = "s"
+                obj_found_string = ""
+                added_species = set()
+                for species in self.species:
+                    if species not in [obj[0] for obj in self.objectives]:
+                        added_species.add(species)
+                        is_reactant_found = self.find_objectives(input_dict, species)
+                for item in self.objectives:
+                    if item[0] in added_species:
+                        obj_found_string = obj_found_string + item[1] + " | " 
+                        self.objectives_reaction_name.append(item[1])
+                obj_found_string = obj_found_string.removesuffix(" | ")
+                obj_message += f'\n        Objective{suff_plurial} : {obj_found_string}'
             
         if self.keep_import_reactions:
             kir_mess += " Kept"
@@ -363,29 +390,29 @@ class NetBase:
         self._set_reactions(reactions_list)
 
 
-    def prefix_id_network(self, name:str, species:str="", type_element:str=""):
-        """Prefix Reaction or Metbolite by the network name (filename) if the tool is used for community.
-        For single network, nothing is prefixed.
+    # def prefix_id_network(self, name:str, species:str="", type_element:str=""):
+    #     """Prefix Reaction or Metbolite by the network name (filename) if the tool is used for community.
+    #     For single network, nothing is prefixed.
 
-        Args:
-            name (str): ID of the element
-            species (str, optional): Network name (from filename). Defaults to "".
-            type_element: (str, optional): "reaction" or "metabolite" or no type. Defaults to "".
+    #     Args:
+    #         name (str): ID of the element
+    #         species (str, optional): Network name (from filename). Defaults to "".
+    #         type_element: (str, optional): "reaction" or "metabolite" or no type. Defaults to "".
 
-        Returns:
-            str: The name prfixed by the network if needed
-        """
-        match self.is_community, type_element:
-            case True,"reaction":
-                return sub("^R_", f"R_{species}_",name)
-            case True,"metabolite":
-                return sub("^M_", f"M_{species}_",name)
-            case True,"metaid":
-                return sub("^meta_R_", f"meta_R_{species}_",name)
-            case True,_:
-                return f"{species}_{name}"
-            case _,_:
-                return name
+    #     Returns:
+    #         str: The name prfixed by the network if needed
+    #     """
+    #     match self.is_community, type_element:
+    #         case True,"reaction":
+    #             return sub("^R_", f"R_{species}_",name)
+    #         case True,"metabolite":
+    #             return sub("^M_", f"M_{species}_",name)
+    #         case True,"metaid":
+    #             return sub("^meta_R_", f"meta_R_{species}_",name)
+    #         case True,_:
+    #             return f"{species}_{name}"
+    #         case _,_:
+    #             return name
 
 
     def get_network(self, species:str, to_print:bool=True, 
@@ -413,7 +440,7 @@ class NetBase:
         for r in reactions_list:
             reaction_id= r.attrib.get("id")
             if self.is_community:
-                reaction_id = self.prefix_id_network(reaction_id, species, "reaction")
+                reaction_id = prefix_id_network(self.is_community, reaction_id, species, "reaction")
             reaction = Reaction(reaction_id, species=species)
             reaction.is_exchange=False
             source_reversible = False if r.attrib.get('reversible') == 'false' else True           
@@ -614,7 +641,7 @@ class NetBase:
                                                   self.use_topological_injections)
                 
 
-        for objective in self.objectives:
+        for objective in self.objectives_reaction_name:
             facts += '\nobjective("'+objective+'").'
         for seed in self.seeds:
             facts += f'\nseed_user({quoted(seed)}).' 
@@ -625,7 +652,7 @@ class NetBase:
             facts += f'\nforbidden({quoted(forbidden)}).'
         for possible in self.possible_seeds:
             facts += f'\np_seed({quoted(possible)}).'
-            
+
         self.facts = facts
         logger.log.info("... DONE")
 
@@ -712,7 +739,7 @@ class NetBase:
             case _:
                 search_mode = 'Other'
                 search_type = 'Enumeration'
-        result = Resmod(model_name, self.objectives, solver_type, search_mode, search_type, 
+        result = Resmod(model_name, self.objectives_reaction_name, solver_type, search_mode, search_type, 
                         size, seeds, flux_lp, flux_cobra, self.run_mode, self.accumulation,
                         self.is_community, transferred_list)
         result_seeds_list.append(result)
@@ -735,7 +762,7 @@ class NetBase:
             flux_no_import = fluxes_no_import
 
         if self.is_community:
-            objective = self.objectives
+            objective = self.objectives_reaction_name
             flux_init = fluxes_init
             
         else:
@@ -805,13 +832,13 @@ class NetBase:
                                        'has_flux_demands', 'timer'])
         fluxes = fluxes.astype(dtypes)
         
-        if self.objectives:
+        if self.objectives_reaction_name:
             if self.result_seeds:
                 logger.log.info("Check fluxes Starting")
                 model = flux.get_model(self.file)
-                fluxes_init = flux.get_init(model, self.objectives)
+                fluxes_init = flux.get_init(model, self.objectives_reaction_name)
                 if not self.keep_import_reactions:
-                    fluxes_no_import = flux.stop_flux(model, self.objectives)
+                    fluxes_no_import = flux.stop_flux(model, self.objectives_reaction_name)
                 self.model[self.name] = model
                 print(color.purple+"\n____________________________________________")
                 print("____________________________________________\n"+color.reset)
@@ -848,7 +875,7 @@ class NetBase:
                                 self.accumulation,
                                 self.is_community,
                                 self.keep_import_reactions,
-                                objectives=self.objectives
+                                objectives=self.objectives_reaction_name
                             ))
 
                         prev_solver_type = None
@@ -961,7 +988,7 @@ class NetBase:
         else:
             self.accumulation = False
 
-        self.objectives = data["NETWORK"]["OBJECTIVE"]
+        self.objectives_reaction_name = data["NETWORK"]["OBJECTIVE"]
  
         if data["NETWORK"]["SEARCH_MODE"] in NET_TITLE.CONVERT_TITLE_MODE:
             self.run_mode = NET_TITLE.CONVERT_TITLE_MODE[data["NETWORK"]["SEARCH_MODE"]]
@@ -1002,7 +1029,7 @@ class NetBase:
                         if solver_type == "FBA" or solver_type == "HYBRID":
                             for flux in data["RESULTS"][solver_type][search_info]["solutions"][solution][5]:
                                 reaction = flux[0]
-                                if reaction in self.objectives:
+                                if reaction in self.objectives_reaction_name:
                                     obj_flux_lp[reaction] = flux[1]
                         if self.is_community:
                             transferred_list = data["RESULTS"][solver_type][search_info]["solutions"][solution][5]
@@ -1063,10 +1090,10 @@ class NetBase:
             bool: Return if the objective reaction has flux (True) or not (False)
         """
         model = flux.get_model(self.file)
-        flux.get_init(model, self.objectives, False)
-        flux.stop_flux(model, self.objectives, False)
+        flux.get_init(model, self.objectives_reaction_name, False)
+        flux.stop_flux(model, self.objectives_reaction_name, False)
 
-        result = Resmod(None, self.objectives, 
+        result = Resmod(None, self.objectives_reaction_name, 
                         None, None, None, len(seeds), seeds, None, None, 
                         is_community=self.is_community, transferred_list=transferred)
 
@@ -1337,7 +1364,7 @@ class Network(NetBase):
         self.file_extension = ""
         self._set_file_extension(file)
         self._set_name()
-        self.species=self.name
+        self.species=[self.name]
         self.sbml=dict()
         self.sbml[self.name], self.sbml_first_line, self.default_namespace = SBML.get_root(self.file)
         self.model[self.name] = SBML.get_model(self.sbml[self.name])
@@ -1354,6 +1381,8 @@ class Network(NetBase):
         if self.objectives is None or not self.objectives:
             try:
                 is_reactant_found = self.find_objectives(input_dict, self.name)
+                # for obj in self.objectives:
+                #     self.objectives_reaction_name.append(obj[1])
             except ValueError as e:
                 is_objective_error = True
                 logger.log.error(str(e))
@@ -1509,14 +1538,14 @@ class Netcom(NetBase):
         
         match tag:
             case 'reaction':
-                element.attrib['id'] = self.prefix_id_network(id, species,"reaction")
+                element.attrib['id'] = prefix_id_network(self.is_community, id, species,"reaction")
                 metaid =  element.attrib.get("metaid")
                 if metaid:
-                    element.attrib['metaid'] = self.prefix_id_network(metaid, species,"metaid")
+                    element.attrib['metaid'] = prefix_id_network(self.is_community, metaid, species,"metaid")
                 l_bound=element.attrib.get('{'+self.fbc[species]+'}lowerFluxBound')
                 u_bound=element.attrib.get('{'+self.fbc[species]+'}upperFluxBound')
-                element.attrib['{'+self.fbc[species]+'}lowerFluxBound']= self.prefix_id_network(l_bound,species)
-                element.attrib['{'+self.fbc[species]+'}upperFluxBound']= self.prefix_id_network(u_bound,species)
+                element.attrib['{'+self.fbc[species]+'}lowerFluxBound']= prefix_id_network(self.is_community, l_bound,species)
+                element.attrib['{'+self.fbc[species]+'}upperFluxBound']= prefix_id_network(self.is_community, u_bound,species)
                 
                 # Clean sbml by deleting notes and gene product association
                 # Otherwise etree create an non findable xmlns attribute to sbml node
@@ -1539,7 +1568,7 @@ class Netcom(NetBase):
                             new_meta =  copy.deepcopy(meta)
                             list_remove_meta.append(meta)
                             metabolite_id = new_meta.attrib.get("species")
-                            pref_metabolite_id = self.prefix_id_network(metabolite_id, species,"metabolite")
+                            pref_metabolite_id = prefix_id_network(self.is_community, metabolite_id, species,"metabolite")
                             new_meta.attrib['species'] = pref_metabolite_id
                             list_add_meta.append(new_meta)
                             
@@ -1550,19 +1579,19 @@ class Netcom(NetBase):
                              el.append(add_meta)
 
             case 'species':
-                element.attrib['id'] = self.prefix_id_network(id, species,"metabolite")
+                element.attrib['id'] = prefix_id_network(self.is_community, id, species,"metabolite")
                 for el in element:
                     subtag = SBML.get_sbml_tag(el)
                     if subtag == "notes":
                         element.remove(el)
 
             case 'parameter':
-                element.attrib['id'] = self.prefix_id_network(id, species)
+                element.attrib['id'] = prefix_id_network(self.is_community, id, species)
 
             case 'listOfFluxObjectives':
                 for o in element:
                     name = o.attrib.get('{'+self.fbc[species]+'}reaction')
-                    o.attrib['{'+self.fbc[species]+'}reaction'] = self.prefix_id_network(name, species,"reaction")
+                    o.attrib['{'+self.fbc[species]+'}reaction'] = prefix_id_network(self.is_community, name, species,"reaction")
             
 
     def append_model(self, merged_model:ET.Element, species:str):
@@ -1605,7 +1634,7 @@ class Netcom(NetBase):
         """
         new_dict=dict()
         for key, val in self.parameters[species].items():
-            new_key=self.prefix_id_network(key,species)
+            new_key=prefix_id_network(self.is_community, key,species)
             new_dict[new_key] = val
         self.parameters[species]=new_dict
 
@@ -1649,7 +1678,7 @@ class Netcom(NetBase):
             # Corrects the SBML Model
             for reaction in list_reactions:
                 reaction_name = reaction.attrib.get("id")
-                reaction_name = self.prefix_id_network(reaction_name, species,"reaction")
+                reaction_name = prefix_id_network(self.is_community, reaction_name, species,"reaction")
                 
                 # Prefix all reactions, reactants, products and bounds with 
                 # network id

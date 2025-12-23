@@ -499,8 +499,8 @@ class HybridReasoning(Solver):
                 message += "\n"
             if  trans_complete is None:
                 trans_complete=color.yellow+"No transferred metabolites\n"+color.reset
-            message += trans_complete + "\n"
-        print(message + "\n")
+            message += trans_complete #+ "\n"
+        print(message)
     
     def temp_rejected(self, number_rejected:int, full_path:str):
         """Save temporary data for rejected number of solution when using cobra hybrid mode

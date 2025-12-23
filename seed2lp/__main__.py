@@ -178,7 +178,7 @@ def chek_inputs(sbml_file:str, input_dict:dict):
     for key, list_element in input_dict.items():
         if key == "Objective":
             for reaction in list_element:
-                if f'{reaction}' not in model_dict["Reactions"]:
+                if f'{reaction[1]}' not in model_dict["Reactions"]:
                     raise ValueError(f"Reaction {reaction} does not exist in network file {sbml_file}\n")
         else:
             for metabolite in list_element:
@@ -225,7 +225,7 @@ def get_input_datas(seeds_file:str=None,
     return input_dict
 
 
-def get_targets(targets_file:str, input_dict:dict) -> dict :
+def get_targets(targets_file:str, input_dict:dict, is_community:bool) -> dict :
     """Get metabolites target and objective reaction from file
     Check if the given data exist into SBML file
     ONLY USED WITH TARGET MODE
@@ -233,6 +233,7 @@ def get_targets(targets_file:str, input_dict:dict) -> dict :
     Args:
         targets_file (str): Path of target file
         input_dict (dict): Constructed dictionnary of inputs
+        is_community (bool): Community mode
 
     Returns:
         dict: Dictionnary of inputs completed
@@ -242,7 +243,7 @@ def get_targets(targets_file:str, input_dict:dict) -> dict :
         logger.log.warning(f"\n{targets_file} is empty.\nPlease check your file and launch again\n")
         exit(1)
     try:
-        input_dict["Targets"], input_dict["Objective"] = utils.get_targets_from_file(targets_file)
+        input_dict["Targets"], input_dict["Objective"] = utils.get_targets_from_file(targets_file, is_community)
     except ValueError as ve:
         logger.log.error(str(ve))
         logger.log.warning("Please check your file and launch again\n")
@@ -287,7 +288,7 @@ def get_temp_dir(args):
     return file.is_valid_dir(temp)
 
 
-def init_s2pl(args:dict, run_mode:str):
+def init_s2pl(args:dict, run_mode:str, is_community:bool=False):
     """Check and validate input data, and get the options used
 
     Args:
@@ -343,7 +344,7 @@ def init_s2pl(args:dict, run_mode:str):
     input_dict = get_input_datas(args['seeds_file'], args['forbidden_seeds_file'], 
                                  args['possible_seeds_file'],forbidden_transfers_file)
     if 'targets_file' in args and args['targets_file']: # only in target mode
-        input_dict = get_targets(args['targets_file'], input_dict)
+        input_dict = get_targets(args['targets_file'], input_dict, is_community)
     if 'objective' in args and args['objective']: # only in full network mode
         input_dict = get_objective(args['objective'], input_dict)
     return options, input_dict, out_dir, temp
@@ -582,7 +583,7 @@ def community(args:argparse, run_mode):
     community_mode = args['community_mode']
     run_solve = args['solve'] 
 
-    options, input_dict, out_dir, temp = init_s2pl(args, community_mode)
+    options, input_dict, out_dir, temp = init_s2pl(args, community_mode, is_community=True)
 
 
     time_data_extraction = time()

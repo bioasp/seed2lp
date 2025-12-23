@@ -58,7 +58,7 @@ bounds(export_exch_created(M),"0","1000") :- export_exch_created(M,B).
 &dom{L..U} = R :- bounds(R,L,U), reaction(R).
 
 % FBA definition
-%OS: Product stoicihiometry bu producting reaction OR
+%OS: Product stoicihiometry by producting reaction OR
 %IS: Consumed stoichiometry by consuming reaction IR
 
 &sum{ OS*OR   : reactant(M,OS,OR,_,_,_);
