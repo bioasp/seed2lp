@@ -42,8 +42,8 @@ jobs:
     - name: Test with pytest
       run: |
         pip install pytest
-        cd tests
-        pytest fba.py
-        pytest full_network.py
-        pytest normalization.py
-        pytest target.py
+        # cd tests
+        pytest tests/fba.py
+        pytest tests/full_network.py
+        pytest tests/normalization.py
+        pytest tests/target.py
