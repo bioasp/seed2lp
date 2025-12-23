@@ -162,8 +162,6 @@ def test_ti():
     seed_list_found=re.findall(MATCH_SEED, network.facts)
     size_seed_found=len(seed_list_found)
     assert size_seed_found == SIZE_SEED_TI
-
-    print(network.facts)
     for seed in SEED_TI:
         assert seed in network.facts
 
