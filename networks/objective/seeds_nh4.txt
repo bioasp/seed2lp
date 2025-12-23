@@ -1,0 +1,6 @@
+M_adp_c
+M_glu__L_e
+M_mal__L_c
+M_nadh_c
+M_nadp_c
+M_succoa_c
