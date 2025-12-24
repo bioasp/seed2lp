@@ -165,7 +165,7 @@ def cli_parser() -> argparse.ArgumentParser:
                - guess_check : Only reasoning with guess and check results using cobra (adapts rules) \n \
                - guess_check_div : Only reasoning with guess and check results using cobra (adapts rules) and add diversity \n \
                - filter : Only reasoning with a cobra filter validation during search (do not adapt rules)  \n \
-               - all : Compute reasoning then hybrid then fba",
+               - all : Compute reasoning then hybrid",
         required=False
     )  
     pp_solve_com = argparse.ArgumentParser(add_help=False, formatter_class=argparse.RawTextHelpFormatter)
@@ -177,7 +177,7 @@ def cli_parser() -> argparse.ArgumentParser:
                - guess_check : Only reasoning with guess and check results using cobra (adapts rules) \n \
                - guess_check_div : Only reasoning with guess and check results using cobra (adapts rules) and add diversity \n \
                - filter : Only reasoning with a cobra filter validation during search (do not adapt rules)  \n \
-               - all : Compute reasoning then hybrid then fba",
+               - all : Compute reasoning",
         required=False
     )
     pp_intersection = argparse.ArgumentParser(add_help=False)
@@ -589,7 +589,7 @@ def cli_parser() -> argparse.ArgumentParser:
           - Write the reactants of the given objectve (-o/--objective) into a file
         """,
         usage="""
-        seed2lp conf [output_directory] \n 
+        seed2lp objective_targets [output_directory] \n 
         """
     )
 
@@ -624,7 +624,7 @@ def cli_parser() -> argparse.ArgumentParser:
           - guess_check_div: Guess check but also forbids subset of seed as next result in order to reduce intersection of solutions
         """,
         usage="""
-        seed2lp community community_file_text sbml_directory result directory \n 
+        seed2lp community [community_file_text] [sbml_directory] [result directory] \n 
         """
     )
 
@@ -643,7 +643,7 @@ def cli_parser() -> argparse.ArgumentParser:
         Can be used for other tool results if the results file has the same json structure.
         """,
         usage="""
-        seed2lp fluxcom community_file_text sbml_directory seed2lp_result_file output_directory \n 
+        seed2lp fluxcom [community_file_text] [sbml_directory] [seed2lp_result_file] [output_directory] \n 
         """
     )
 
