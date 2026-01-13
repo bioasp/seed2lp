@@ -551,7 +551,7 @@ def cli_parser() -> argparse.ArgumentParser:
         ],
         description=
         """
-        From Seed2lp seed searching results json file, this functionnality detemine scope inferred by seeeds using Network Expansion.
+        From Seed2lp seed searching results json file, this functionnality determine scope inferred by seeeds using Network Expansion.
         Can be used for other tool results if the results file has the same json structure.
         The scope calculation is done with MeneTools.
         """,

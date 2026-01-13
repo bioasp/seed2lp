@@ -1,5 +1,7 @@
 # Options
 
+## Input file formats
+
 ## Full Network
 
 ## Target
