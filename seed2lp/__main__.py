@@ -3,7 +3,7 @@
 """
 
 
-import argparse
+import argparse, logging
 
 from time import time
 from sys import exit
@@ -21,11 +21,13 @@ from .description import Description
 from .file import load_json
 from pathlib import Path
 from .scope import Scope
-from . import logger
+#from . import logger
+from .logger import get_logger#, set_log_dir
 
 #Global variable needed
 PROJECT_DIR = path.dirname(path.abspath(__file__))
-CLEAN_TEMP=False
+CLEAN_TEMP=True
+LOG_DIR:str
 
 
 ####################### FUNCTIONS ##########################
@@ -186,7 +188,7 @@ def chek_inputs(sbml_file:str, input_dict:dict):
                     raise ValueError(f"Metabolite {metabolite} does not exist in network file {sbml_file}\n")
 
 
-def get_input_datas(seeds_file:str=None,
+def get_input_datas(logger:logging, seeds_file:str=None,
                     forbidden_seeds:str=None, possible_seeds:str=None,
                     forbidden_transfers_file:str=None):
     """Get data from files given by user
@@ -202,30 +204,30 @@ def get_input_datas(seeds_file:str=None,
     input_dict = dict()
     if seeds_file:
         if file.file_is_empty(seeds_file):
-            logger.log.warning(f"\n{seeds_file} is empty.\nPlease check your file and launch again\n")
+            logger.warning(f"\n{seeds_file} is empty.\nPlease check your file and launch again\n")
         else:
             input_dict["Seeds"] = utils.get_ids_from_file(seeds_file, 'seed_user')
     if forbidden_seeds:
         if file.file_is_empty(forbidden_seeds):
-            logger.log.warning(f"\n{forbidden_seeds} is empty.\nPlease check your file and launch again\n")
+            logger.warning(f"\n{forbidden_seeds} is empty.\nPlease check your file and launch again\n")
         else:
             input_dict["Forbidden seeds"] = utils.get_ids_from_file(forbidden_seeds, 'forbidden')
     if possible_seeds:
         if file.file_is_empty(possible_seeds):
-            logger.log.warning(f"\n{possible_seeds} is empty.\nPlease check your file and launch again\n")
+            logger.warning(f"\n{possible_seeds} is empty.\nPlease check your file and launch again\n")
             possible_seeds=None
         else:
             input_dict["Possible seeds"] = utils.get_ids_from_file(possible_seeds, 'sub_seed')
     if forbidden_transfers_file:
         if file.file_is_empty(forbidden_transfers_file):
-            logger.log.warning(f"\n{forbidden_transfers_file} is empty.\nPlease check your file and launch again\n")
+            logger.warning(f"\n{forbidden_transfers_file} is empty.\nPlease check your file and launch again\n")
         #TODO: Finish forbidden transfers file
         #else:
         #    input_dict["Forbidden transfers"] = utils.get_list_transfers(forbidden_transfers_file)
     return input_dict
 
 
-def get_targets(targets_file:str, input_dict:dict, is_community:bool) -> dict :
+def get_targets(logger:logging,targets_file:str, input_dict:dict, is_community:bool) -> dict :
     """Get metabolites target and objective reaction from file
     Check if the given data exist into SBML file
     ONLY USED WITH TARGET MODE
@@ -240,13 +242,13 @@ def get_targets(targets_file:str, input_dict:dict, is_community:bool) -> dict :
     """
 
     if file.file_is_empty(targets_file):
-        logger.log.warning(f"\n{targets_file} is empty.\nPlease check your file and launch again\n")
+        logger.warning(f"\n{targets_file} is empty.\nPlease check your file and launch again\n")
         exit(1)
     try:
         input_dict["Targets"], input_dict["Objective"] = utils.get_targets_from_file(targets_file, is_community)
     except ValueError as ve:
-        logger.log.error(str(ve))
-        logger.log.warning("Please check your file and launch again\n")
+        logger.error(str(ve))
+        logger.warning("Please check your file and launch again\n")
         exit(1)
     except NotImplementedError as nie:
         print(str(nie))
@@ -288,7 +290,7 @@ def get_temp_dir(args):
     return file.is_valid_dir(temp)
 
 
-def init_s2pl(args:dict, run_mode:str, is_community:bool=False):
+def init_s2pl(log_dir:str, args:dict, run_mode:str, is_community:bool=False):
     """Check and validate input data, and get the options used
 
     Args:
@@ -323,7 +325,16 @@ def init_s2pl(args:dict, run_mode:str, is_community:bool=False):
         infile=args['infile']
     elif 'comfile' in args:
         infile=args['comfile']
-    logger.get_logger(infile, options["short"],args['verbose'])
+
+
+    #logger=get_logger(infile, options["short"], args['verbose'])
+    #get_logger(infile, options["short"], LOG_DIR, args['verbose'])
+    logger, log_path = get_logger(
+        log_dir=log_dir,
+        sbml_file=infile,
+        short_option= options["short"],
+        verbose=args['verbose']
+    )
     
     temp = get_temp_dir(args)
 
@@ -341,16 +352,16 @@ def init_s2pl(args:dict, run_mode:str, is_community:bool=False):
     ###############################################################
 
     # Getting the networks from sbml file
-    input_dict = get_input_datas(args['seeds_file'], args['forbidden_seeds_file'], 
+    input_dict = get_input_datas(logger, args['seeds_file'], args['forbidden_seeds_file'], 
                                  args['possible_seeds_file'],forbidden_transfers_file)
     if 'targets_file' in args and args['targets_file']: # only in target mode
-        input_dict = get_targets(args['targets_file'], input_dict, is_community)
+        input_dict = get_targets(logger, args['targets_file'], input_dict, is_community)
     if 'objective' in args and args['objective']: # only in full network mode
         input_dict = get_objective(args['objective'], input_dict)
-    return options, input_dict, out_dir, temp
+    return options, input_dict, out_dir, temp, logger, log_path
 
 
-def initiate_results(network:Network, options:dict, args:dict, run_mode:str):
+def initiate_results(logger:logging, network:Network, options:dict, args:dict, run_mode:str):
     """Initiate the result dictionnary with users options and given data such as forbidden seed,
     possible seed and defined seeds.
 
@@ -378,7 +389,7 @@ def initiate_results(network:Network, options:dict, args:dict, run_mode:str):
         if args['mode'] == 'minimize' or args['mode'] == 'all':
             user_data['POSSIBLE SEEDS'] = network.possible_seeds
         else:
-            logger.log.error("Possible seed can be used only with minimize mode")
+            logger.error("Possible seed can be used only with minimize mode")
             exit(1)
     
     res_option['REACTION'] = options['reaction']
@@ -423,7 +434,7 @@ def initiate_results(network:Network, options:dict, args:dict, run_mode:str):
 
 
 #----------------------- SEED2LP ---------------------------
-def run_seed2lp(args:dict, run_mode):
+def run_seed2lp(args:dict, run_mode, log_dir:str):
     """Launch seed searching for one network after normalising it.
 
     Args:
@@ -433,24 +444,24 @@ def run_seed2lp(args:dict, run_mode):
     subset_minimal=False
     solutions = dict()
 
-    options, input_dict, out_dir, temp = init_s2pl(args, run_mode)
+    options, input_dict, out_dir, temp, logger, log_path = init_s2pl(log_dir, args, run_mode)
     # Verify if input data exist into sbml file
     try:
         chek_inputs(args['infile'], input_dict)
     except ValueError as e :
-        logger.log.error(str(e))
+        logger.error(str(e))
         exit(1)
 
     time_data_extraction = time()
     network = Network(args['infile'], run_mode, args['targets_as_seeds'], 
                     args['topological_injection'], args['keep_import_reactions'],
-                    input_dict, args['accumulation'])
+                    input_dict, args['accumulation'], verbose=args['verbose'])
 
     
     time_data_extraction = time() - time_data_extraction
 
 
-    results = initiate_results(network,options,args,run_mode)
+    results = initiate_results(logger, network,options,args,run_mode)
     network.convert_to_facts()
 
     if args['instance']:
@@ -478,16 +489,16 @@ def run_seed2lp(args:dict, run_mode):
                     end_message = " aborted! No Objective found.\n"
                     match run_solve,run_mode:
                         case _,"target":
-                            logger.log.error(f"Mode Target {end_message}")
+                            logger.error(f"Mode Target {end_message}")
                         case 'filter','full':
-                            logger.log.error(f"Solve Filter {end_message}")
+                            logger.error(f"Solve Filter {end_message}")
                         case 'guess_check','full':
-                            logger.log.error(f"Solve Guess Check {end_message}")
+                            logger.error(f"Solve Guess Check {end_message}")
                         case 'guess_check_div','full':
-                            logger.log.error(f"Solve Guess Check Diversity {end_message}")
+                            logger.error(f"Solve Guess Check Diversity {end_message}")
                         # In reasoning classic, in Full Network, no need to have an objective reaction (event it is deleted)
                         case 'all','full': # | 'reasoning','target':
-                            model = Reasoning(run_mode, "reasoning", network, args['time_limit'], args['number_solution'], 
+                            model = Reasoning(run_mode, "reasoning", network, log_path, args['time_limit'], args['number_solution'], 
                                             args['clingo_configuration'], args['clingo_strategy'], 
                                             args['intersection'], args['union'], minimize, subset_minimal, 
                                             temp, options['short'],
@@ -497,13 +508,13 @@ def run_seed2lp(args:dict, run_mode):
                             results["RESULTS"] = solutions
                             # Intermediar saving in case of hybrid mode fails 
                             file.save(f'{network.name}_{options["short"]}_results',out_dir, results, 'json')
-                            logger.log.error(f"Solve Filter / Guess Check / Guess Check Diversity {end_message}")
+                            logger.error(f"Solve Filter / Guess Check / Guess Check Diversity {end_message}")
                             solutions['REASONING-OTHER'] = "No objective found"
                 elif run_mode == "target" and not network.targets:
-                    logger.log.error(f"Mode REASONING aborted! No target found")
+                    logger.error(f"Mode REASONING aborted! No target found")
                     solutions['REASONING'] = "No target found"
                 else:
-                    model = Reasoning(run_mode, run_solve, network, args['time_limit'], args['number_solution'], 
+                    model = Reasoning(run_mode, run_solve, network, log_path, args['time_limit'], args['number_solution'], 
                                     args['clingo_configuration'], args['clingo_strategy'], 
                                     args['intersection'], args['union'], minimize, subset_minimal, 
                                     temp, options['short'],
@@ -516,10 +527,10 @@ def run_seed2lp(args:dict, run_mode):
 
             if run_solve == "hybrid"  or run_solve == 'all':
                 if not network.objectives or network.is_objective_error:
-                    logger.log.error(f"Mode HYBRID aborted! No objective found")
+                    logger.error(f"Mode HYBRID aborted! No objective found")
                     solutions['HYBRID'] = "No objective found"
                 else:
-                    model = Hybrid(run_mode, run_solve, network, args['time_limit'], args['number_solution'], 
+                    model = Hybrid(run_mode, run_solve, network, log_path, args['time_limit'], args['number_solution'], 
                                 args['clingo_configuration'], args['clingo_strategy'],  
                                 args['intersection'], args['union'], minimize, subset_minimal,
                                 args['maximize_flux'], temp, 
@@ -529,10 +540,10 @@ def run_seed2lp(args:dict, run_mode):
                     results["RESULTS"] = solutions
         case "fba":
             if not network.objectives or network.is_objective_error:
-                logger.log.error(f"Mode FBA aborted! No objective found")
+                logger.error(f"Mode FBA aborted! No objective found")
                 solutions['FBA'] = "No objective found" 
             else:
-                model = FBA(run_mode, network, args['time_limit'], args['number_solution'], 
+                model = FBA(run_mode, network, log_path, args['time_limit'], args['number_solution'], 
                             args['clingo_configuration'], args['clingo_strategy'],
                             args['intersection'], args['union'], minimize, subset_minimal,
                             args['maximize_flux'], temp, 
@@ -555,7 +566,7 @@ def run_seed2lp(args:dict, run_mode):
         time_mess += f'\nTIME {name.center(namewidth)}: {value}'
     
     print(time_mess)
-    logger.log.info(time_mess)
+    logger.info(time_mess)
     print("\n")    
 
     # Save the result into json file
@@ -573,7 +584,7 @@ def run_seed2lp(args:dict, run_mode):
 
 
 #------------------ COMMUNITY SEED SEARCHING -------------------
-def community(args:argparse, run_mode):
+def community(args:argparse, run_mode, log_dir:str):
     """Launch seed searching for a community after merging Networks and normalising it
 
     Args:
@@ -583,17 +594,17 @@ def community(args:argparse, run_mode):
     community_mode = args['community_mode']
     run_solve = args['solve'] 
 
-    options, input_dict, out_dir, temp = init_s2pl(args, community_mode, is_community=True)
+    options, input_dict, out_dir, temp, logger, log_path = init_s2pl(log_dir, args, community_mode, is_community=True)
 
 
     time_data_extraction = time()
 
     network=Netcom(args["comfile"], args["sbmldir"], temp, run_mode, run_solve, community_mode, args['targets_as_seeds'], args['topological_injection'], 
            args['keep_import_reactions'], input_dict, args['accumulation'], to_print=True, 
-           write_sbml=True, equality_flux=args["equality_flux"])
+           write_sbml=True, equality_flux=args["equality_flux"], verbose=args['verbose'])
     time_data_extraction = time() - time_data_extraction
     
-    results = initiate_results(network,options,args,run_mode)
+    results = initiate_results(logger, network,options,args,run_mode)
     network.convert_to_facts()
 
 
@@ -605,10 +616,10 @@ def community(args:argparse, run_mode):
     # we force this whatever it is given or not
     if network.is_objective_error and (run_solve != "reasoning" or run_mode == "community"):
         end_message = " aborted! \nMissing objective at least for one network.\n"
-        logger.log.error(f"Mode community {end_message}")
+        logger.error(f"Mode community {end_message}")
 
     else:
-        model = ComReasoning(run_mode, run_solve, network, args['time_limit'], args['number_solution'], 
+        model = ComReasoning(run_mode, run_solve, network, log_path, args['time_limit'], args['number_solution'], 
                         args['clingo_configuration'], args['clingo_strategy'], 
                         args['intersection'], args['union'],
                         temp, options['short'],
@@ -638,7 +649,7 @@ def community(args:argparse, run_mode):
         time_mess += f'\nTIME {name.center(namewidth)}: {value}'
     
     print(time_mess)
-    logger.log.info(time_mess)
+    logger.info(time_mess)
     print("\n")
 
     # Save all fluxes into tsv file
@@ -655,7 +666,7 @@ def community(args:argparse, run_mode):
 
 
 #---------------------- NETWORK ---------------------------
-def network_rendering(args:argparse):
+def network_rendering(args:argparse, log_dir:str):
     """Launch rendering as Network description (reaction formula)
     or as Graphs
 
@@ -666,7 +677,15 @@ def network_rendering(args:argparse):
         reac_status="import_rxn_"
     else:
         reac_status="rm_rxn_"
-    logger.get_logger(args['infile'], f"{reac_status}network_render", args['verbose'])
+
+    #logger.get_logger(args['infile'], f"{reac_status}network_render", args['verbose'])
+    #get_logger(args['infile'], f"{reac_status}network_render", LOG_DIR, args['verbose'])
+    logger, log_path = get_logger(
+        log_dir=log_dir,
+        sbml_file=args['infile'],
+        short_option=  f"{reac_status}network_render",
+        verbose=args['verbose']
+    )
 
     network = Description(args['infile'], args['keep_import_reactions'], 
                           args['output_dir'], details = args['network_details'],
@@ -688,7 +707,7 @@ def network_rendering(args:argparse):
 
 
 #---------------------- FLUX ---------------------------
-def network_flux(args:argparse):
+def network_flux(args:argparse, log_dir:str):
     """Check the Network flux using cobra from a seed2lp result file.
     Needs the sbml file of the network.
     Write the file in output directory.
@@ -696,13 +715,21 @@ def network_flux(args:argparse):
     Args:
         args (argparse): List or arguments
     """
-    logger.get_logger(args['infile'], "check_fluxes", args['verbose'])
+    # logger.get_logger(args['infile'], "check_fluxes", args['verbose'])
+    #get_logger(args['infile'], "check_fluxes", LOG_DIR, args['verbose'])
+    logger, log_path = get_logger(
+        log_dir=log_dir,
+        sbml_file=args['infile'],
+        short_option= "check_fluxes",
+        verbose=args['verbose']
+    )
+
     input_dict=dict()
 
     data = load_json(args['result_file'])
-    input_dict["Objective"] = data["NETWORK"]["OBJECTIVE"]
+    input_dict["Objective"] = data["NETWORK"]["OBJECTIVE"][0][1]
 
-    network = Network(args['infile'], to_print=False, input_dict=input_dict)
+    network = Network(args['infile'], to_print=False, input_dict=input_dict, verbose=args['verbose'])
     maximize, solve = network.convert_data_to_resmod(data)
     network.check_fluxes(maximize,  args["flux_parallel"])
 
@@ -713,7 +740,7 @@ def network_flux(args:argparse):
     file.save(f'{network.name}_{options["short"]}_fluxes_from_result', args['output_dir'], network.fluxes, 'tsv')
 
 
-def network_flux_community(args:argparse):
+def network_flux_community(args:argparse, log_dir:str):
     """Check the Network flux using cobra from a seed2lp result file.
     Needs a community file containing a list of networks and the sbml directory.
     Write the file in output directory.
@@ -721,7 +748,15 @@ def network_flux_community(args:argparse):
     Args:
         args (argparse): List or arguments
     """
-    logger.get_logger(args['comfile'], "check_fluxes", args['verbose'])
+    # logger.get_logger(args['comfile'], "check_fluxes", args['verbose'])
+    #get_logger(args['comfile'], "check_fluxes", LOG_DIR, args['verbose'])
+    logger, log_path = get_logger(
+        log_dir=log_dir,
+        sbml_file=args['comfile'],
+        short_option= "check_fluxes",
+        verbose=args['verbose']
+    )
+
     input_dict=dict()
 
     data = load_json(args['result_file'])
@@ -736,7 +771,7 @@ def network_flux_community(args:argparse):
     temp = get_temp_dir(args)
     
     network=Netcom(args["comfile"], args["sbmldir"], temp, run_solve=run_solve, input_dict=input_dict, to_print=False, 
-                   write_sbml=True, equality_flux=args["equality_flux"])
+                   write_sbml=True, equality_flux=args["equality_flux"], verbose=args['verbose'])
 
     maximize, solve = network.convert_data_to_resmod(data)
 
@@ -749,7 +784,7 @@ def network_flux_community(args:argparse):
 
 
 #---------------------- SCOPE ---------------------------
-def scope(args:argparse):
+def scope(args:argparse, log_dir:str):
     """Check the Network flux using cobra from a seed2lp result file.
     Needs the sbml file of the network.
     Write the file in output directory.
@@ -757,9 +792,17 @@ def scope(args:argparse):
     Args:
         args (argparse): List or arguments
     """
-    logger.get_logger(args['infile'], "scope", args['verbose'])
+    # logger.get_logger(args['infile'], "scope", args['verbose'])
+    #get_logger(args['infile'], "scope", LOG_DIR, args['verbose'])
+    logger, log_path = get_logger(
+        log_dir=log_dir,
+        sbml_file=args['infile'],
+        short_option= "scope",
+        verbose=args['verbose']
+    )
+
     input_dict=dict()
-    network = Network(args['infile'], to_print=False, input_dict=input_dict)
+    network = Network(args['infile'], to_print=False, input_dict=input_dict, verbose=args['verbose'])
     data = load_json(args['result_file'])
     network.convert_data_to_resmod(data)
     scope = Scope(args['infile'], network, args['output_dir'])
@@ -780,22 +823,30 @@ def save_conf(args:argparse):
 
 
 #------------------ WRITE TARGETS ----------------------
-def get_objective_targets(args:argparse):
+def get_objective_targets(args:argparse, log_dir:str):
     """Get the metabolites reactant of objective reaction or found 
 
     Args:
         args (argparse): List or arguments
     """
-    logger.get_logger(args['infile'], "objective_targets", args['verbose'])
-    input_dict = get_input_datas()
+    # logger.get_logger(args['infile'], "objective_targets", args['verbose'])
+    #get_logger(args['infile'], "objective_targets", LOG_DIR, args['verbose'])
+    logger, log_path = get_logger(
+        log_dir=log_dir,
+        sbml_file=args['infile'],
+        short_option= "objective_targets",
+        verbose=args['verbose']
+    )
+
+    input_dict = get_input_datas(logger)
     if 'objective' in args and args['objective']: # only in full network mode
         input_dict = get_objective(args['objective'], input_dict)
     try:
         chek_inputs(args['infile'], input_dict)
     except ValueError as e :
-        logger.log.error(str(e))
+        logger.error(str(e))
         exit(1)
-    network = Network(args['infile'], run_mode="target", input_dict=input_dict, to_print=False)
+    network = Network(args['infile'], run_mode="target", input_dict=input_dict, to_print=False, verbose=args['verbose'])
 
     print("List of targets: ",[*network.targets])
     file.save(f"{network.name}_targets", args['output_dir'],[*network.targets],"txt")
@@ -808,29 +859,32 @@ def get_objective_targets(args:argparse):
 
 
 def main():
+    global LOG_DIR
     args = argument.parse_args()
     cfg = argument.get_config(args, PROJECT_DIR)
 
-    logger.set_log_dir(path.join(args.output_dir,"logs"))
-    is_valid_dir(logger.LOG_DIR)
+    # LOG_DIR =path.join(args.output_dir,"logs")
+    # is_valid_dir(LOG_DIR)
+    log_dir=path.join(args.output_dir,"logs")
+    is_valid_dir(log_dir)
 
     match args.cmd:
         case "target" | "full" | "fba":
-            run_seed2lp(cfg, args.cmd)
+            run_seed2lp(cfg, args.cmd, log_dir)
         case "network":
-            network_rendering(cfg)
+            network_rendering(cfg, log_dir)
         case "flux":
-            network_flux(cfg)
+            network_flux(cfg, log_dir)
         case "scope":
-            scope(cfg)
+            scope(cfg, log_dir)
         case "conf":
             save_conf(cfg)
         case "objective_targets":
-            get_objective_targets(cfg)
+            get_objective_targets(cfg, log_dir)
         case "community":
-            community(cfg, args.cmd)
+            community(cfg, args.cmd, log_dir)
         case "fluxcom":
-            network_flux_community(cfg)
+            network_flux_community(cfg, log_dir)
     
 if __name__ == '__main__':
     main()

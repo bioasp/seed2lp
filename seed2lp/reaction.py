@@ -6,8 +6,9 @@
 #   - Reactants (list): List of reactants (object Metabolite)
 #   - Products (list): List of list of products (object Metabolite)
 
+import logging
 from seed2lp.metabolite import Metabolite
-from . import logger
+#from . import logger
 
 class Reaction:
     def __init__(self, name:str, reversible:bool=False, lbound:float=None, ubound:float=None, 
@@ -32,6 +33,7 @@ class Reaction:
         self.is_reversible_modified = False
         self.species = species
         self.has_rm_prefix = False
+        self.logger = logging.getLogger("s2lp")
 
 
     ######################## SETTER ########################
@@ -186,7 +188,7 @@ class Reaction:
         # a trace of bondaries into asp fact, the rm_ prefix is needed for the reverse of the remaning reactions
         if not keep_import_reactions and (is_import_reaction or (self.has_rm_prefix and is_reversed)):
             prefix = "rm_"
-            logger.log.info(f"Reaction {self.name} artificially removed into lp facts with a prefix 'rm_'")
+            self.logger.info(f"Reaction {self.name} artificially removed into lp facts with a prefix 'rm_'")
 
         facts += f'{prefix}reaction("{name}").\n'
         facts += f'{prefix}bounds("{name}","{"{:.10f}".format(lbound)}","{"{:.10f}".format(ubound)}").\n'

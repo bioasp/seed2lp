@@ -11,11 +11,11 @@ reaction(R) :- dreaction(R).
 
 
 % the edges are linking reactants to products of each reaction.
-oedge(T,P) :- reactant(T,R) ; product(P,R).
+oedge(T,P) :- reactant(T,_,R,_,_,_) ; product(P,_,R,_,_,_).
 
 % the nodes
-node(M) :- reactant(M,_).
-node(M) :- product(M,_).
+node(M) :- reactant(M,_,_,_,_,_).
+node(M) :- product(M,_,_,_,_,_).
 
 % #show oedge/2.
 % #show node/1.

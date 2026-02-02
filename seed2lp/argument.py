@@ -624,7 +624,7 @@ def cli_parser() -> argparse.ArgumentParser:
           - guess_check_div: Guess check but also forbids subset of seed as next result in order to reduce intersection of solutions
         """,
         usage="""
-        seed2lp community [community_file_text] [sbml_directory] [result directory] \n 
+        seed2lp community [community_file_text] [sbml_directory] [result_directory] \n 
         """
     )
 

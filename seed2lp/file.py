@@ -1,7 +1,8 @@
+import logging
 from os import path, makedirs, stat, remove
 from json import dump, load
 from csv import writer, reader
-from . import logger
+#from . import logger
 
 
 def existant_path(inpath:str) -> str:
@@ -29,12 +30,13 @@ def is_valid_dir(dirpath):
     Returns:
         bool: True if dir exists, False otherwise
     """
+    logger = logging.getLogger("s2lp")
     if not path.isdir(dirpath):
         try:
             makedirs(dirpath)
             return dirpath
         except OSError as e:
-            logger.log.error(e)
+            logger.error(e)
             return None
     else:
         return dirpath
@@ -64,6 +66,7 @@ def save(filename:str, directory:str, results, type:str, is_result_temp=False):
         type (str): Type of output fils (json or tsv or txt)
     """
 
+    logger = logging.getLogger("s2lp")
     out_file_path = path.join(directory,filename)
     try:
         match type:
@@ -91,7 +94,7 @@ def save(filename:str, directory:str, results, type:str, is_result_temp=False):
                 with open(out_file_path, "w") as f:
                     f.write("\n".join(results))
     except  Exception as e:
-        logger.log.error(f"while saving file: {e}")
+        logger.error(f"while saving file: {e}")
     
 
 

@@ -8,14 +8,15 @@
 
 from seed2lp.network import Network
 from seed2lp.solver import Solver
-from . import clingo_lpx, color, logger
+from . import clingo_lpx, color
+from .logger import print_log
 
 
 ###################################################################
 ################### Class Hybrid : herit Solver ################### 
 ###################################################################
 class Hybrid(Solver):
-    def __init__(self, run_mode:str, run_solve:str, network:Network, 
+    def __init__(self, run_mode:str, run_solve:str, network:Network, log_path:str,
                  time_limit_minute:float=None, number_solution:int=None, 
                  clingo_configuration:str=None, clingo_strategy:str=None, 
                  intersection:bool=False, union:bool=False,
@@ -43,7 +44,7 @@ class Hybrid(Solver):
             short_option (str, optional): Short way to write option on filename. Defaults to None.
             verbose (bool, optional): Set debug mode. Defaults to False.
         """
-        super().__init__(run_mode, network, time_limit_minute, number_solution, clingo_configuration, 
+        super().__init__(run_mode, network, log_path, time_limit_minute, number_solution, clingo_configuration, 
                          clingo_strategy, intersection, union, minimize, subset_minimal, temp_dir, short_option, run_solve, verbose)
         
         self.is_linear = True
@@ -65,7 +66,7 @@ class Hybrid(Solver):
             f"                    {color.bold}HYBRID{color.cyan_light}\n"\
             "############################################\n" \
             "############################################\n"
-        logger.print_log(title_mess, "info", color.cyan_light) 
+        print_log(self.logger, title_mess, "info", color.cyan_light) 
 
     
     def _init_clingo_constant(self):
@@ -74,11 +75,11 @@ class Hybrid(Solver):
         self.init_const()
 
         if self.maximize_flux:
-            logger.print_log('Flux: MAXIMIZATION', "info")
+            print_log(self.logger, 'Flux: MAXIMIZATION', "info", verbose=self.verbose)
         else:
-            logger.print_log('Flux: NO MAXIMIZATION', "info")
-        logger.print_log(f"Time limit: {self.time_limit_minute} minutes", 'info')
-        logger.print_log(f"Solution number limit: {self.number_solution}", 'info')
+            print_log(self.logger, 'Flux: NO MAXIMIZATION', "info")
+        print_log(self.logger, f"Time limit: {self.time_limit_minute} minutes", 'info', verbose=self.verbose)
+        print_log(self.logger, f"Solution number limit: {self.number_solution}", 'info', verbose=self.verbose)
 
 
     def search_seed(self): 
@@ -94,19 +95,19 @@ class Hybrid(Solver):
             files.append(self.asp.ASP_SRC_MAXIMIZE_FLUX)
         if self.subset_minimal:
             self.get_message('subsetmin')
-            #logger.print_log("GROUNDING...", "info")
+            #print_log(self.logger, "GROUNDING...", "info")
             #self.grounded, timer, err_output, error_code, memory = self.ground(files, self.clingo_constant, self.is_linear, self.verbose)
             self.search_subsetmin(files)
         if self.minimize:
             self.get_message('minimize')
             if self.network.is_subseed:
                 files.append(self.asp.ASP_SRC_MAXIMIZE_PRODUCED_TARGET)
-                logger.print_log('POSSIBLE SEED: Given', "info")
-                logger.print_log('  A subset of possible seed is search \n  maximising the number of produced target', "info")
+                print_log(self.logger, 'POSSIBLE SEED: Given', "info", verbose=self.verbose)
+                print_log(self.logger, '  A subset of possible seed is search \n  maximising the number of produced target', "info", verbose=self.verbose)
                 self.clingo_constant.append('-c')
                 self.clingo_constant.append('subseed=1')  
             files.append(self.asp.ASP_SRC_MINIMIZE)
-            #logger.print_log("GROUNDING...", "info")
+            #print_log(self.logger, "GROUNDING...", "info")
             #self.grounded, timer, err_output, error_code, memory = self.ground(files, self.clingo_constant, self.is_linear, self.verbose)
             self.search_minimize(files)
             self.get_message('end')
@@ -115,7 +116,7 @@ class Hybrid(Solver):
     def search_minimize(self, asp_files):
         """Launch seed searching with minimze options
         """
-        logger.print_log("Finding optimum...", "info")
+        print_log(self.logger, "Finding optimum...", "info", verbose=self.verbose)
         self.solve(asp_files, "minimize-one-model")
 
         if self.one_model_unsat:
@@ -134,7 +135,7 @@ class Hybrid(Solver):
                 self.solve(asp_files, "minimize-enumeration")
             else:
                 self.get_message('enumeration')  
-                logger.print_log(f"\nNot computed: {opti_message}", "info") 
+                print_log(self.logger, f"\nNot computed: {opti_message}", "info", verbose=self.verbose) 
 
         if self.intersection:   
             if ok_opti:
@@ -142,7 +143,7 @@ class Hybrid(Solver):
                 self.solve(asp_files, "minimize-intersection")
             else:
                 self.get_message('intersection')
-                logger.print_log(f"\nNot computed: {opti_message}", "info")  
+                print_log(self.logger, f"\nNot computed: {opti_message}", "info", verbose=self.verbose)  
 
 
     def search_subsetmin(self, asp_files):
@@ -153,7 +154,7 @@ class Hybrid(Solver):
             self.solve(asp_files, "submin-enumeration")
         else:
             self.number_solution = 1
-            logger.print_log("\n--------------- One solution ---------------", "info")  
+            print_log(self.logger, "\n--------------- One solution ---------------", "info", verbose=self.verbose)  
             self.solve(asp_files, "submin-enumeration")
             
 
@@ -201,7 +202,7 @@ class Hybrid(Solver):
             asp_files (list, optional): List of ASP files used for sovling. Defaults to [].
             search_mode (str, optional): Describe the launch mode. . Defaults to "".
         """
-        logger.print_log("SOLVING...\n", "info")
+        print_log(self.logger, "SOLVING...\n", "info", verbose=self.verbose)
         results = dict()
         solution_list = dict()
         timer = dict()
@@ -224,35 +225,35 @@ class Hybrid(Solver):
                 proc_output, err, error_code, \
                     memory, is_killed = clingo_lpx.solve(cmd, self.time_limit)
                 self.get_message("command")
-                logger.print_log(f'{cmd_str}', 'debug')
+                print_log(self.logger, f'{cmd_str}', 'debug', verbose=self.verbose)
                 
                 self.get_error(error_code, err)
                 output_full_list, unsatisfiable, self.optimum_found, full_timers, opt = clingo_lpx.result_convert(proc_output,
                                                                                            self.network.objectives, 
                                                                                            "", is_killed, False)
                 if unsatisfiable:
-                    logger.print_log('Unsatisfiable problem', "error") 
+                    print_log(self.logger, 'Unsatisfiable problem', "error", verbose=self.verbose) 
 
                 elif self.optimum_found: 
-                    logger.print_log("Optimum Found", "info")
+                    print_log(self.logger, "Optimum Found", "info", verbose=self.verbose)
                     self.one_model_unsat = False
                     one_model_list=output_full_list[list(output_full_list.keys())[-1]]
                     self.optimum=opt
                     self.get_separate_optimum()
                     #TODO Corrects the producible targets count
                     #if self.network.is_subseed:
-                    #    logger.print_log((f"Number of producible targets: {- self.opt_prod_tgt}"), 'info')
+                    #    print_log(self.logger, (f"Number of producible targets: {- self.opt_prod_tgt}"), 'info')
                     #TODO END
-                    logger.print_log(f"Minimal size of seed set is {self.opt_size}\n", 'info')
+                    print_log(self.logger, f"Minimal size of seed set is {self.opt_size}\n", 'info', verbose=self.verbose)
                     if self.optimum is not None and self.network.keep_import_reactions:
-                        logger.print_log("Try with the option remove import reactions.", "info")
+                        print_log(self.logger, "Try with the option remove import reactions.", "info", verbose=self.verbose)
                     solution_list[model_type] = one_model_list
                     #Get obejctives fluxes and add results seeds to network object
                     obj_flux_dict = self.get_objectives_flux(one_model_list[5])
                     self.add_result_seeds(search_mode, model_type, one_model_list[1], one_model_list[3], obj_flux_dict)
                 # Satisfiable probleme but optimum not found in given time
                 else:
-                    logger.print_log('Optimum not found', "error") 
+                    print_log(self.logger, 'Optimum not found', "error", verbose=self.verbose) 
 
             case "minimize-enumeration":
                 cmd = clingo_lpx.command(files=asp_files, options=full_option, nb_model= self.number_solution,
@@ -261,12 +262,12 @@ class Hybrid(Solver):
                 proc_output, err, error_code, \
                     memory, is_killed = clingo_lpx.solve(cmd, self.time_limit)
                 self.get_message("command")
-                logger.print_log(f'{cmd_str}', 'debug')
+                print_log(self.logger, f'{cmd_str}', 'debug', verbose=self.verbose)
                 self.get_error(error_code, err)
                 solution_list, unsatisfiable, _, full_timers, _ = clingo_lpx.result_convert(proc_output,
                                                                             self.network.objectives, "enumeration", is_killed)
                 if unsatisfiable:
-                    logger.print_log('Unsatisfiable problem', "error") 
+                    print_log(self.logger, 'Unsatisfiable problem', "error", verbose=self.verbose) 
                 else:
                     for  model_name, solution in solution_list.items():
                         #Get obejctives fluxes and add results seeds to network object
@@ -280,12 +281,12 @@ class Hybrid(Solver):
                 proc_output, err, error_code, \
                     memory, is_killed = clingo_lpx.solve(cmd, self.time_limit)
                 self.get_message("command")
-                logger.print_log(f'{cmd_str}', 'debug')
+                print_log(self.logger, f'{cmd_str}', 'debug', verbose=self.verbose)
                 self.get_error(error_code, err)
                 solution_list, unsatisfiable, _, full_timers,_ = clingo_lpx.result_convert(proc_output,
                                                                             self.network.objectives, "enumeration", is_killed)
                 if unsatisfiable:
-                    logger.print_log('Unsatisfiable problem', "error") 
+                    print_log(self.logger, 'Unsatisfiable problem', "error", verbose=self.verbose) 
                 else:
                     for  model_name, solution in solution_list.items():
                         #Get obejctives fluxes and add results seeds to network object
@@ -299,12 +300,12 @@ class Hybrid(Solver):
                 proc_output, err, error_code, \
                     memory, is_killed = clingo_lpx.solve(cmd, self.time_limit)
                 self.get_message("command")
-                logger.print_log(f'{cmd_str}', 'debug')
+                print_log(self.logger, f'{cmd_str}', 'debug', verbose=self.verbose)
                 self.get_error(error_code, err)
                 output_full_list, unsatisfiable, _, full_timers = clingo_lpx.result_convert(proc_output,
                                                                                 self.network.objectives, 'cautious', is_killed)
                 if unsatisfiable:
-                    logger.print_log('Unsatisfiable problem', "error") 
+                    print_log(self.logger, 'Unsatisfiable problem', "error", verbose=self.verbose) 
                 elif output_full_list:
                     model = output_full_list[list(output_full_list.keys())[-1]]
                     solution_list[model_type ] = model
@@ -321,12 +322,12 @@ class Hybrid(Solver):
                     memory, is_killed = clingo_lpx.solve(files=asp_files, options=full_option,
                                          time_limit=self.time_limit)
                 self.get_message("command")
-                logger.print_log(f'{cmd_str}', 'debug')
+                print_log(self.logger, f'{cmd_str}', 'debug', verbose=self.verbose)
                 self.get_error(error_code, err)
                 output_full_list, unsatisfiable, _, full_timers = clingo_lpx.result_convert(proc_output,
                                                                                 self.network.objectives, 'cautious', is_killed)
                 if unsatisfiable:
-                    logger.print_log('Unsatisfiable problem', "error") 
+                    print_log(self.logger, 'Unsatisfiable problem', "error", verbose=self.verbose) 
                 elif output_full_list:
                     model = output_full_list[list(output_full_list.keys())[-1]]
                     solution_list[model_type] = model
@@ -359,7 +360,7 @@ class Hybrid(Solver):
             print(f'error_code = {error_code}')
             raise ValueError(err.decode())
         elif err:
-            logger.print_log(err.decode(), 'debug')
+            print_log(self.logger, err.decode(), 'debug', verbose=self.verbose)
 
      ######################################################## 
 
@@ -368,7 +369,7 @@ class Hybrid(Solver):
 ##################### Class FBA : herit Hybrid #################### 
 ###################################################################
 class FBA(Hybrid):
-    def __init__(self,  run_mode:str, network:Network, 
+    def __init__(self,  run_mode:str, network:Network, log_path:str, 
                  time_limit_minute:float=None, number_solution:int=None, 
                  clingo_configuration:str=None, clingo_strategy:str=None, 
                  intersection:bool=False, union:bool=False, 
@@ -395,7 +396,7 @@ class FBA(Hybrid):
             short_option (str, optional): Short way to write option on filename. Defaults to None.
             verbose (bool, optional): Set debug mode. Defaults to False.
         """
-        super().__init__(run_mode, None, network, 
+        super().__init__(run_mode, None, network, log_path,
                          time_limit_minute, number_solution, 
                          clingo_configuration, clingo_strategy, 
                          intersection, union, minimize,
@@ -413,7 +414,7 @@ class FBA(Hybrid):
             f"                     {color.bold}FBA{color.cyan_light}\n"\
             "############################################\n" \
             "############################################\n"
-        logger.print_log(title_mess, "info", color.cyan_light) 
+        print_log(self.logger, title_mess, "info", color.cyan_light, self.verbose) 
 
     def add_result_seeds(self, search_mode:str, model_name:str, len:int, seeds:list, flux_list:list):
         """Add a formated resulted set of seeds into the network object

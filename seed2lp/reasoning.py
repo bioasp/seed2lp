@@ -5,14 +5,15 @@ import clyngor
 from time import time
 from .network import Network
 from .reasoninghybrid import HybridReasoning
-from . import color, logger
+from . import color
+from .logger import print_log
 
 
 ###################################################################
 ############ Class Reasoning : herit HybridReasoning ############## 
 ###################################################################
 class Reasoning(HybridReasoning):
-    def __init__(self, run_mode:str, run_solve:str, network:Network,
+    def __init__(self, run_mode:str, run_solve:str, network:Network, log_path:str,
                  time_limit_minute:float=None, number_solution:int=None, 
                  clingo_configuration:str=None, clingo_strategy:str=None, 
                  intersection:bool=False, union:bool=False, 
@@ -37,7 +38,7 @@ class Reasoning(HybridReasoning):
             short_option (str, optional): Short way to write option on filename. Defaults to None.
             verbose (bool, optional): Set debug mode. Defaults to False.
         """
-        super().__init__(run_mode, network, time_limit_minute, number_solution, clingo_configuration, 
+        super().__init__(run_mode, network, log_path, time_limit_minute, number_solution, clingo_configuration, 
                          clingo_strategy, intersection, union, minimize, subset_minimal, 
                          temp_dir, short_option, run_solve, verbose, community_mode, all_transfers)
 
@@ -47,7 +48,7 @@ class Reasoning(HybridReasoning):
             f"                   {color.bold}REASONING{color.cyan_light}\n"\
             "############################################\n" \
             "############################################\n"
-        logger.print_log(title_mess, "info", color.cyan_light) 
+        print_log(self.logger, title_mess, "info", color.cyan_light) 
         self._set_clingo_constant()
         self._set_temp_result_file()
 
@@ -58,8 +59,8 @@ class Reasoning(HybridReasoning):
         """Prepare ASP constant command for resolution
         """
         self.init_const()
-        logger.print_log(f"Time limit: {self.time_limit_minute} minutes", "info")
-        logger.print_log( f"Solution number limit: {self.number_solution}", "info")
+        print_log(self.logger, f"Time limit: {self.time_limit_minute} minutes", "info")
+        print_log(self.logger,  f"Solution number limit: {self.number_solution}", "info")
     ########################################################  
 
 
@@ -92,10 +93,12 @@ class Reasoning(HybridReasoning):
                 self.search_subsetmin(timer, 'filter')
 
             if self.run_solve == "guess_check" or self.run_solve ==  "all":
+                self.diversity=False
                 self.get_message('guess_check')
                 self.search_subsetmin(timer, 'guess_check')
 
             if self.run_solve == "guess_check_div" or self.run_solve ==  "all":
+                self.diversity=True
                 self.get_message('guess_check_div')
                 self.search_subsetmin(timer, 'guess_check_div')
 
@@ -104,7 +107,7 @@ class Reasoning(HybridReasoning):
             self.get_message('minimize')
             if self.network.is_subseed:
                 self.asp_files.append(self.asp.ASP_SRC_MAXIMIZE_PRODUCED_TARGET)
-                logger.print_log('POSSIBLE SEED: Given\n  A subset of possible seed is search \n  maximising the number of produced target', 'info')
+                print_log(self.logger, 'POSSIBLE SEED: Given\n  A subset of possible seed is search \n  maximising the number of produced target', 'info')
                 self.clingo_constant.append('-c')
                 self.clingo_constant.append('subseed=1') 
             self.asp_files.append(self.asp.ASP_SRC_MINIMIZE)
@@ -143,7 +146,7 @@ class Reasoning(HybridReasoning):
             asp_files (list): List of ASP files, included th network asp file saved in temp directory
         """
         timer = dict()
-        logger.print_log('self.groundING...', 'info')
+        print_log(self.logger, 'GROUNDING...', 'info')
         time_ground = time()
         const_option = ""
         const_option = ' '.join(self.clingo_constant)
@@ -167,21 +170,21 @@ class Reasoning(HybridReasoning):
         seeds = list()
         
         if self.optimum is None:
-            logger.print_log('\tNo seed found', 'info')
+            print_log(self.logger, '\tNo seed found', 'info')
         else: 
             self.get_separate_optimum()
-            logger.print_log(f"Optimum found.", "info") 
+            print_log(self.logger, f"Optimum found.", "info") 
             if self.network.is_subseed:
-                logger.print_log((f"Number of producible targets: {- self.opt_prod_tgt}"), 'info')
-            logger.print_log(f"Minimal size of seed set is {self.opt_size}\n", 'info')
+                print_log(self.logger, (f"Number of producible targets: {- self.opt_prod_tgt}"), 'info', self.verbose)
+            print_log(self.logger, f"Minimal size of seed set is {self.opt_size}\n", 'info', self.verbose)
             if self.opt_size > 0:
                 seeds = [args[0] for args in one_model.get('seed', ())]
                 seeds=list(sorted(seeds))
             else:
                 seeds = []
                 if self.network.keep_import_reactions:
-                    logger.print_log("Try with the option remove import reactions.", 'info')
-            #logger.print_log(f"\nOne solution:\n{', '.join(map(str, seeds))}\n", 'info')
+                    print_log(self.logger, "Try with the option remove import reactions.", 'info', self.verbose)
+            #print_log(self.logger, f"\nOne solution:\n{', '.join(map(str, seeds))}\n", 'info')
             solution_list['model_one_solution'] = ["size", self.opt_size] + \
                                     ["Set of seeds", seeds]
 
@@ -195,7 +198,7 @@ class Reasoning(HybridReasoning):
             timer (dict): Timer dictionnary containing grouding time
             step (str, optional): step solving mode (classic, filter, guess_check, guess_check_div). Defaults to "classic".
         """
-        logger.print_log("Finding optimum...", "info")
+        print_log(self.logger, "Finding optimum...", "info")
         self.solve("minimize-one-model", timer, self.asp_files, step, True)
 
         if not self.optimum_found:
@@ -211,7 +214,7 @@ class Reasoning(HybridReasoning):
                 self.solve("minimize-intersection", timer, self.asp_files, step)
             else:
                 self.get_message('intersection')
-                logger.print_log(f"\nNot computed: {opti_message}", "error") 
+                print_log(self.logger, f"\nNot computed: {opti_message}", "error") 
             
         if self.union:       
             if ok_opti:
@@ -219,7 +222,7 @@ class Reasoning(HybridReasoning):
                 self.solve("minimize-union", timer, self.asp_files, step)
             else:
                 self.get_message('union')
-                logger.print_log(f"\nNot computed: {opti_message}", "error") 
+                print_log(self.logger, f"\nNot computed: {opti_message}", "error") 
 
         if self.enumeration: 
             if ok_opti:
@@ -227,7 +230,7 @@ class Reasoning(HybridReasoning):
                 self.solve("minimize-enumeration", timer, self.asp_files, step)
             else:
                 self.get_message('enumeration') 
-                logger.print_log(f"\nNot computed: {opti_message}", "error")
+                print_log(self.logger, f"\nNot computed: {opti_message}", "error")
 
 
     def search_subsetmin(self, timer:dict, step:str="classic"):
@@ -247,7 +250,7 @@ class Reasoning(HybridReasoning):
 
         if self.intersection: 
             self.get_message('intersection')
-            logger.print_log("SOLVING...\n", "info")
+            print_log(self.logger, "SOLVING...\n", "info")
             self.solve("submin-intersection", timer, self.asp_files, step)
         
 
@@ -282,7 +285,7 @@ class Reasoning(HybridReasoning):
             is_one_model (bool, optional): Define if it is the minimizing one model we are searching. Defaults to False.
         """
 
-        logger.print_log("SOLVING...\n", "info")
+        print_log(self.logger, "SOLVING...\n", "info")
         results = dict()
         one_model = None
         number_rejected = None
@@ -305,7 +308,7 @@ class Reasoning(HybridReasoning):
                                     time_limit=self.time_limit).discard_quotes.by_predicate
                 time_solve = time() - time_solve
                 self.get_message("command")
-                logger.print_log(f'{models.command}', 'debug')
+                print_log(self.logger, f'{models.command}', 'debug')
                 for model, opt, optimum_found in models.by_arity.with_optimality:
                     if optimum_found:
                         self.optimum_found = True
@@ -318,7 +321,7 @@ class Reasoning(HybridReasoning):
                             else:
                                 self.optimum = 0
                 if not self.optimum_found:
-                    logger.print_log('Optimum not found', "error") 
+                    print_log(self.logger, 'Optimum not found', "error") 
                 else:
                     solution_list, seeds = self.write_one_model_solution(one_model)
                     self.network.add_result_seeds('REASONING', search_mode, model_type, len(seeds), seeds)
@@ -340,7 +343,7 @@ class Reasoning(HybridReasoning):
                                     time_limit=self.time_limit).discard_quotes.by_predicate
                 time_solve = time() - time_solve
                 self.get_message("command")
-                logger.print_log(f'{models.command}', 'debug')
+                print_log(self.logger, f'{models.command}', 'debug')
                 has_solution=False
                 for model in models:
                     has_solution=True
@@ -357,7 +360,7 @@ class Reasoning(HybridReasoning):
                     solution_list, _ = self.complete_solutions(solution_list, 'model_'+ model_type, len(seeds), seeds)
                     self.network.add_result_seeds('REASONING', search_mode, model_type, len(seeds), seeds)
                 else:
-                    logger.print_log('Unsatisfiable problem', "error") 
+                    print_log(self.logger, 'Unsatisfiable problem', "error") 
 
             # FILTER OR GUESS-CHECK mode
             #TODO redo intersection and union mode
@@ -401,7 +404,7 @@ class Reasoning(HybridReasoning):
             models = clyngor.solve(files=asp_files, options=construct_option, 
                                 time_limit=self.time_limit, nb_model=self.number_solution).discard_quotes.by_predicate
         self.get_message("command")
-        logger.print_log(f'{models.command}', 'debug')
+        print_log(self.logger, f'{models.command}', 'debug')
         idx = 1
         m = models
         models_list = list(m).copy()
@@ -428,7 +431,7 @@ class Reasoning(HybridReasoning):
                 self.network.add_result_seeds('REASONING', search_mode, 'model_'+str(idx), size, seeds, transferred_list=trans_solution_list)
                 idx += 1
         else:
-            logger.print_log('Unsatisfiable problem', "error")
+            print_log(self.logger, 'Unsatisfiable problem', "error")
         return solution_list
 
 

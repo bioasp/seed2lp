@@ -2,11 +2,19 @@
 Clingo lpx functions for launching command and extract results.
 """
 
-import subprocess 
+import subprocess, logging
 import json
-from resource import getrusage, RUSAGE_CHILDREN
+#from resource import getrusage, RUSAGE_CHILDREN
 from .utils import repair_json
-from . import logger, color
+from . import color #logger
+try:
+    from resource import getrusage, RUSAGE_CHILDREN
+except ImportError:
+    RUSAGE_CHILDREN = 0
+    def getrusage(x):
+        class ret:
+            ru_maxrss = 2**20
+        return ret
 
 
 def command(files:list, options:list, nb_model:int=0, time_limit:int=0) -> iter:
@@ -59,7 +67,7 @@ def solve(cmd:list, time_limit:int):
     Returns:
         proc_output (str), err_output (str), error_code (int), memory (float), is_killed (bool)
     """
-    
+    logger = logging.getLogger("s2lp")
     cmd.append(f'--outf=2')
     is_killed=False
     try:
@@ -67,7 +75,7 @@ def solve(cmd:list, time_limit:int):
         if time_limit:
             process.wait(timeout=time_limit+60)
     except subprocess.TimeoutExpired:
-        logger.log.error(f'Timeout: {time_limit/60} min expired')
+        logger.error(f'Timeout: {time_limit/60} min expired')
         process.kill()
         process.wait()
         is_killed=True
@@ -78,7 +86,7 @@ def solve(cmd:list, time_limit:int):
     if is_killed:
         error_code=0
     if error_code==1:
-        logger.log.error(f'Timeout: {time_limit/60} min expired')
+        logger.error(f'Timeout: {time_limit/60} min expired')
     return str(proc_output, 'UTF-8'), err_output, error_code, round(memory,3), is_killed
 
 

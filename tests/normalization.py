@@ -72,7 +72,7 @@ def test_exchange():
     topological_injection = False
     keep_import_reactions = False
 
-    network = get_network(INFILE, run_mode, targets_as_seeds, 
+    network, log_path = get_network(INFILE, run_mode, targets_as_seeds, 
                     topological_injection, keep_import_reactions)
     assert set(network.exchanged_reactions) == EXCH
 
@@ -83,7 +83,7 @@ def test_delete():
     topological_injection = False
     keep_import_reactions = False
 
-    network = get_network(INFILE, run_mode, targets_as_seeds, 
+    network, log_path = get_network(INFILE, run_mode, targets_as_seeds, 
                     topological_injection, keep_import_reactions)
     assert set(network.deleted_reactions) == DEL
 
@@ -94,7 +94,7 @@ def test_rev_modified():
     topological_injection = False
     keep_import_reactions = False
 
-    network = get_network(INFILE, run_mode, targets_as_seeds, 
+    network, log_path = get_network(INFILE, run_mode, targets_as_seeds, 
                     topological_injection, keep_import_reactions)
     assert set(network.reversible_modified_reactions.keys()) == REV
 
@@ -108,7 +108,7 @@ def test_rm_rxn():
     topological_injection = False
     keep_import_reactions = False
 
-    network = get_network(INFILE, run_mode, targets_as_seeds, 
+    network, log_path = get_network(INFILE, run_mode, targets_as_seeds, 
                     topological_injection, keep_import_reactions)
     network.convert_to_facts()
 
@@ -130,7 +130,7 @@ def test_kir():
     topological_injection = False
     keep_import_reactions = True
 
-    network = get_network(INFILE, run_mode, targets_as_seeds, 
+    network, log_path = get_network(INFILE, run_mode, targets_as_seeds, 
                     topological_injection, keep_import_reactions)
     network.convert_to_facts()
     
@@ -151,7 +151,7 @@ def test_ti():
     topological_injection = True
     keep_import_reactions = True
 
-    network = get_network(INFILE, run_mode, targets_as_seeds, 
+    network, log_path = get_network(INFILE, run_mode, targets_as_seeds, 
                     topological_injection, keep_import_reactions)
     network.convert_to_facts()
 
@@ -172,7 +172,7 @@ def test_taf():
     targets_as_seeds = False
     topological_injection = False
     keep_import_reactions = False
-    network = get_network(INFILE, run_mode, targets_as_seeds, 
+    network, log_path = get_network(INFILE, run_mode, targets_as_seeds, 
                     topological_injection, keep_import_reactions)
     assert set(network.forbidden_seeds) == FORBID_TAF
 
@@ -182,7 +182,7 @@ def test_tas():
     targets_as_seeds = True
     topological_injection = False
     keep_import_reactions = False
-    network = get_network(INFILE, run_mode, targets_as_seeds, 
+    network, log_path = get_network(INFILE, run_mode, targets_as_seeds, 
                     topological_injection, keep_import_reactions)
     # check if list is empty
     assert not network.forbidden_seeds

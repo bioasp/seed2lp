@@ -3,18 +3,20 @@ import os
 import clyngor
 import re
 from re import findall
-from . import logger
+#from . import logger
 from csv import reader
 
 
 def solve(*args, **kwargs):
+    logger = logging.getLogger("s2lp")
+
     "Wrapper around clyngor.solve"
     kwargs.setdefault('use_clingo_module', False)
     try:
         return clyngor.solve(*args, **kwargs)
     except FileNotFoundError as err:
         if 'clingo' in err.filename:
-            logger.log.error('Binary file clingo is not accessible in the PATH.')
+            logger.error('Binary file clingo is not accessible in the PATH.')
             exit(1)
         else:  raise err
 
@@ -188,6 +190,8 @@ def repair_json(json_str:str, is_clingo_lpx:bool=False):
     Returns:
         str: complete output on json format
     """
+    logger = logging.getLogger("s2lp")
+
     close = {'{': '}', 
              '[': ']'}
     if is_clingo_lpx:
@@ -209,7 +213,7 @@ def repair_json(json_str:str, is_clingo_lpx:bool=False):
     close_str=""
     for i, open in reversed(list(enumerate(missing_list))):
         close_str += "\n" + i * "\t" + close[open]
-    logger.log.warning("Output not totally recovered. Json has been repaired but might miss results")
+    logger.warning("Output not totally recovered. Json has been repaired but might miss results")
     return output+close_str
 
 def prefix_id_network(is_community:bool, name:str, species:str="", type_element:str=""):

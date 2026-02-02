@@ -7,7 +7,7 @@ import pandas as pd
 import re
 from os import path
 from seed2lp.network import Network     
-from . import flux, logger, color
+from . import flux, color # logger,
 import warnings
 import difflib
 import seed2lp.sbml as SBML
@@ -21,15 +21,15 @@ BISEAU_VIZ = """
 #defined reactant/4.
 #defined product/4.
 #defined reaction/1.
-link(T,R) :- reactant(T,_,R,_).
-link(R,P) :- product(P,_,R,_).
+link(T,R) :- reactant(T,_,R,_,_,_).
+link(R,P) :- product(P,_,R,_,_,_).
 shape(R,rectangle) :- reaction(R).
 obj_property(edge,arrowhead,vee).
 """
 BISEAU_VIZ_NOREACTION = """
-link(M,P) :- product(P,_,R,_) ; reactant(M,_,R,_).
-link(P,P) :- product(P,_,R,_) ; not reactant(_,_,R,_).
-link(M,M) :- reactant(M,_,R,_), not product(_,_,R,_).
+link(M,P) :- product(P,_,R,_,_,_) ; reactant(M,_,R,_,_,_).
+link(P,P) :- product(P,_,R,_,_,_) ; not reactant(_,_,R,_,_,_).
+link(M,M) :- reactant(M,_,R,_,_,_), not product(_,_,R,_,_,_).
 obj_property(edge,arrowhead,vee).
 """
 
@@ -102,7 +102,7 @@ class Description(Network):
     def details_from_lp(self):
         """Get the network description from lp facts and save it
         """
-        logger.log.info("Start Getting Details from LP file")
+        self.logger.info("Start Getting Details from LP file")
         reactions_composition_df = pd.DataFrame(columns=['reaction', 'metabolite', 'type_metabolite', 'stoichiometry'])
         reaction_df = pd.DataFrame(columns=['reaction', 'low_bound', 'up_bound','is_forward', 'is_reverse', 'is_low_set'])
         only_forward=list()
@@ -251,13 +251,13 @@ class Description(Network):
         #print(reaction_without_reactant)
         #print("REACTION WITHOUT PRODUCT")
         #print(reaction_without_product)
-        save(self.lp_details , full_details)
+        self.save(self.lp_details , full_details)
         
 
     def details_from_cobra(self):
         """Get the network description from sbml file by using cobra and save it
         """
-        logger.log.info("Start Getting Details from Cobra file")
+        self.logger.info("Start Getting Details from Cobra file")
         warnings.filterwarnings("error")
         model = flux.get_model(self.file)
         if not self.keep_import_reactions:
@@ -267,14 +267,14 @@ class Description(Network):
             full_details += f"{reaction}\t[{reaction.lower_bound}, {reaction.upper_bound}]\n"
             
         self.cobra_details = path.join(self.out_dir, f"{self.name}_{self.short_option}_details_from_cobra.txt")
-        save(self.cobra_details, full_details)
+        self.save(self.cobra_details, full_details)
 
 
     def details_diff(self):
         """Compare the Network description from cobra and lp facts
         save the diff information into file
         """
-        logger.log.info("Start checking diff between Cobra and LP Network")
+        self.logger.info("Start checking diff between Cobra and LP Network")
         diff = ""
         with open(self.cobra_details) as cobra_details:
             cobra_details_text = cobra_details.readlines()
@@ -292,12 +292,13 @@ class Description(Network):
         lp_details.close()
 
         diff_path = path.join(self.out_dir, f"{self.name}_{self.short_option}_details_diff.txt")
-        save(diff_path, diff)
+        self.save(diff_path, diff)
 
     def render_network(self):
         """From lp facts render the network graph with or without reaction
         """
         import biseau
+        check_graphviz()
         out_file = path.join(self.out_dir, f"{self.name}_{self.short_option}_visu")
 
         print(f"\n\n{color.cyan_dark}############################################")  
@@ -343,10 +344,10 @@ class Description(Network):
         print(f"############################################\n{color.reset}") 
 
         if self.keep_import_reactions:
-            logger.log.warning("IMPORT REACTION KEPT")
+            self.logger.warning("IMPORT REACTION KEPT")
         else:
-            logger.log.warning("IMPORT REACTION REMOVED BY DEFAULT")
-            logger.log.warning("If you want to keep import reaction\nuse option -kir / --keep-import-reactions")
+            self.logger.warning("IMPORT REACTION REMOVED BY DEFAULT")
+            self.logger.warning("If you want to keep import reaction\nuse option -kir / --keep-import-reactions")
         species=self.name
         original_reactions = SBML.get_listOfReactions(self.model[species])
 
@@ -366,7 +367,7 @@ class Description(Network):
             if reaction_name in self.deleted_reactions:
                 self.sbml_remove_reaction(reaction, species)
                 rm_reac_message+=f"\n\t- {reaction_name}"
-                logger.log.info(rm_reac_message)
+                self.logger.info(rm_reac_message)
             else:
                 # Change the reversibility
                 is_modif_rev = self.sbml_review_reversibilty(reaction_name, reaction)
@@ -389,11 +390,11 @@ class Description(Network):
 
         #print and log
         if is_modif_rev_log:
-            logger.log.warning(modif_rev_message)
+            self.logger.warning(modif_rev_message)
         if is_switch_meta_log:
-            logger.log.warning(switch_meta_message)
+            self.logger.warning(switch_meta_message)
         if is_rm_import_log:
-            logger.log.warning(rm_import_message)
+            self.logger.warning(rm_import_message)
 
         # Replace list of parameters because we added new specific parameters for the exchange reactions
         self.sbml_review_parameters(species)
@@ -405,20 +406,30 @@ class Description(Network):
         file_path = path.join(self.out_dir, self.name+".xml") 
         str_model =  self.sbml_first_line+SBML.etree_to_string(self.sbml[species])
         print(f"File saved at: {file_path}")
-        save(file_path, str_model)
-
-    ######################################################## 
+        self.save(file_path, str_model)
 
 
-######################## FUNCTIONS ########################
-def save(out_file:str, data):
-    """Save file of Network description or graphs
+    def save(self, out_file:str, data):
+        """Save file of Network description or graphs
 
-    Args:
-        out_file (str): Output file path
-        data: Graph or Network details data
-    """
-    with open(out_file, 'w') as f:
-        f.write(data)
-    f.close()
-    logger.log.info(f"File saved at: {out_file}")
+        Args:
+            out_file (str): Output file path
+            data: Graph or Network details data
+        """
+        with open(out_file, 'w') as f:
+            f.write(data)
+        f.close()
+        self.logger.info(f"File saved at: {out_file}")
+
+       
+def check_graphviz():
+    import shutil
+    if shutil.which("dot") is None:
+        raise RuntimeError(
+            f"\n\n{color.red_bright}Graphviz is required and missing from your environment.{color.reset}\n"
+            f"First install it with:\n"
+            f"  {color.cyan_dark}conda install -c conda-forge graphviz{color.reset}\n"
+            f"or\n"
+            f"  {color.cyan_dark}sudo apt install graphviz{color.reset}\n"
+            f"Then retry.\n"
+        )

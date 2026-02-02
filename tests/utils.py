@@ -3,7 +3,7 @@ from seed2lp.network import Network
 from seed2lp.reasoning import Reasoning
 from seed2lp.linear import Hybrid, FBA
 from seed2lp.__main__ import get_reaction_options, get_input_datas
-from seed2lp import logger
+from seed2lp.logger import get_logger
 from seed2lp.file import is_valid_dir
 
 ################ DIRECTORIES AND FILES ###################
@@ -12,8 +12,6 @@ RESULT_DIR=path.join(TEST_DIR,"results")
 TMP_DIR=path.join(TEST_DIR,"tmp")
 is_valid_dir(RESULT_DIR)
 is_valid_dir(TMP_DIR)
-logger.set_log_dir(path.join(TEST_DIR, RESULT_DIR,"logs"))
-is_valid_dir(logger.LOG_DIR)
 ######################################################## 
 
 
@@ -79,23 +77,23 @@ def search_seed(infile:str, run_mode:str, solve:str, optim:str, targets_as_seeds
     
 
     
-    network= get_network(infile, run_mode, targets_as_seeds, topological_injection, 
+    network, log_path = get_network(infile, run_mode, targets_as_seeds, topological_injection, 
                 keep_import_reactions, accumulation, opt_short=options['short'])
     network.convert_to_facts()
     network.simplify()
     
     if run_mode != "fba":
-        model = Reasoning(run_mode, solve, network, TIME_LIMIT, NB_SOLUTION, 
+        model = Reasoning(run_mode, solve, network, log_path, TIME_LIMIT, NB_SOLUTION, 
                         CLINGO_CONF,CLINGO_STRAT, INTERSECTION, UNION, minimize, subset_minimal, 
                         TMP_DIR, options['short'], VERBOSE)
         model.search_seed()
         
-        model = Hybrid(run_mode, solve, network, TIME_LIMIT, NB_SOLUTION, 
+        model = Hybrid(run_mode, solve, network, log_path, TIME_LIMIT, NB_SOLUTION, 
                     CLINGO_CONF,CLINGO_STRAT, INTERSECTION, UNION, minimize, subset_minimal,
                     maximization, TMP_DIR, options['short'], VERBOSE)
         model.search_seed()
     else:
-        model = FBA(run_mode, network, TIME_LIMIT, NB_SOLUTION, 
+        model = FBA(run_mode, network, log_path, TIME_LIMIT, NB_SOLUTION, 
                     CLINGO_CONF,CLINGO_STRAT, INTERSECTION, UNION, minimize, subset_minimal,
                     maximization, TMP_DIR, options['short'], VERBOSE)
         model.search_seed()
@@ -168,14 +166,24 @@ def get_network(infile:str, run_mode:str, targets_as_seeds:bool,
                  seeds_file:str=None, forbidden_seeds_file:str=None, possible_seeds_file:str=None, 
                  opt_short:str="test"):
     
-    logger.get_logger(infile, opt_short, VERBOSE)
+    #logger.get_logger(infile, opt_short, VERBOSE)
+    #get_logger(infile, opt_short, VERBOSE)
+    log_dir = path.join(TEST_DIR, RESULT_DIR,"logs")
+    is_valid_dir(log_dir)
+    logger, log_path = get_logger(
+        log_dir=log_dir,
+        sbml_file=infile,
+        short_option= "get_network",
+        verbose=False
+    )
+
     input_dict = get_input_datas(seeds_file, forbidden_seeds_file, possible_seeds_file)
     network = Network(infile, run_mode, targets_as_seeds, 
                     topological_injection, keep_import_reactions,
-                    input_dict, accumulation)
+                    input_dict, accumulation, verbose=VERBOSE)
     
     if not targets_as_seeds:  
         network.forbidden_seeds += network.targets
-    return network
+    return network, log_path
     
 ######################################################## 

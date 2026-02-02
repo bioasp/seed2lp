@@ -117,6 +117,8 @@ python setup.py install
 
 Requires Python >= 3.11. 
 
+Need to manually install graphviz: `conda install -c conda-forge graphviz`. If not installed and Seed2LP is launched for a graph visualisation of the network, the tool will raise an error and invite the user to install graphviz.
+
 For below requirements, installing Seed2LP will install all needed packages if not already installed.
 
 
