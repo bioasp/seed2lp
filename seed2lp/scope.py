@@ -1,3 +1,4 @@
+import logging 
 from .network import Network
 from menetools import run_menescope
 from .file import is_valid_dir, save
@@ -7,7 +8,7 @@ import libsbml
 from padmet.utils.sbmlPlugin import convert_from_coded_id
 from padmet.utils.connection import sbmlGenerator
 import sys
-from . import logger
+#from . import logger
 
 
 class Scope:
@@ -23,6 +24,7 @@ class Scope:
         self.output_dir = output_dir
         self.dir_seeds_sbml = is_valid_dir(join(output_dir,'sbml'))
         self.dir_scope = is_valid_dir(join(output_dir,'scope'))
+        self.logger = logging.getLogger("s2lp")
 
     ######################## METHODS ########################
     def execute(self):
@@ -59,12 +61,12 @@ class Scope:
 
             # Write the seed into sbl format for each solutions
             create_species_sbml(seeds, seeds_sbml_path)
-            logger.log.info(f"Seeds sbml file created: {seeds_sbml_path}")
+            self.logger.info(f"Seeds sbml file created: {seeds_sbml_path}")
             
             # Run menescope from seed to get the scope
-            logger.log.info(f"Scope running for {seeds_sbml_path}...") 
+            self.logger.info(f"Scope running for {seeds_sbml_path}...") 
             scope_model = run_menescope(self.file, seeds_sbml_path)
-            logger.log.info(f"Scope terminated.") 
+            self.logger.info(f"Scope terminated.") 
             scope_model["size_scope"] = len(scope_model["scope"])
             scope_model["size_all_metabolites"] = len(set_used_metabolites)
 
@@ -73,7 +75,7 @@ class Scope:
             print("size of scope", scope_model["size_scope"])
             print("size of all metabolites", scope_model["size_all_metabolites"],"\n\n")
             save(f'{result.name}', scope_dir_path, scope_model, "json")
-            logger.log.info(f"Scope saved in: {scope_dir_path}/{result.name}.json.") 
+            self.logger.info(f"Scope saved in: {scope_dir_path}/{result.name}.json.") 
 
 
 
@@ -99,26 +101,26 @@ def create_species_sbml(metabolites, outputfile):
         sbmlGenerator.check(s, 'create species')
         forbidden_characters_detacted = [char for char in forbidden_charlist if char in compound]
         if len(forbidden_characters_detacted) > 0:
-            logger.log.warning("Forbidden character ({0}) in {1}. SBML creation will failed.".format(' '.join(forbidden_characters_detacted), compound))
+            self.logger.warning("Forbidden character ({0}) in {1}. SBML creation will failed.".format(' '.join(forbidden_characters_detacted), compound))
             forbidden_character_in_metabolites = True
         try:
             sbmlGenerator.check(s.setId(compound), 'set species id')
         except:
             issue_trying_to_add_species = True
-            logger.log.warning("Issue when trying to add compound {0}.".format(compound))
+            self.logger.warning("Issue when trying to add compound {0}.".format(compound))
 
         if comp is not None:
             sbmlGenerator.check(s.setCompartment(comp), 'set species compartment')
         elif comp is None:
-            logger.log.warning("No compartment for " + compound)
+            self.logger.warning("No compartment for " + compound)
 
     if issue_trying_to_add_species is True and forbidden_character_in_metabolites is True:
-        logger.log.warning("Forbidden character in compound ID, SBML creation will failed.")
-        logger.log.warning("Modify the metabolic networks SBMl file by renaming these metabolites and removing the forbidden character.")
+        self.logger.warning("Forbidden character in compound ID, SBML creation will failed.")
+        self.logger.warning("Modify the metabolic networks SBMl file by renaming these metabolites and removing the forbidden character.")
         sys.exit(1)
     if issue_trying_to_add_species is True and forbidden_character_in_metabolites is None:
-        logger.log.warning("Issue when trying to add metabolite into SBML file, potential issue with SBML format.")
-        logger.log.warning("Modify the metabolic networks SBMl file by renaming these metabolites and removing the forbidden character.")
+        self.logger.warning("Issue when trying to add metabolite into SBML file, potential issue with SBML format.")
+        self.logger.warning("Modify the metabolic networks SBMl file by renaming these metabolites and removing the forbidden character.")
         sys.exit(1)
 
     libsbml.writeSBMLToFile(document, outputfile)

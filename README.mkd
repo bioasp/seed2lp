@@ -1,16 +1,99 @@
 # Seed2LP 
 
-Seed2LP is a Python tool that searches seeds in metabolic networks. It uses answer set programming (ASP) and provides three approaches for seed detection: 
+## Introduction
+Seed2LP is a formal framework for metabolic seed inference, based on logical and combinatorial modelling of metabolic networks, and extended to a hybrid approach combining logical reasoning and flow analysis. The objective is to identify the minimal sets of metabolites necessary for the functional activation of a metabolic network, while integrating constraints from stoichiometry and flow feasibility.
+
+In its basic formulation, Seed2LP represents a metabolic network as a system of logical rules derived from the reaction structure: a reaction is activatable if all of its substrates are available, and its activation makes its products available. This logical abstraction makes it possible to define metabolic accessibility independently of any kinetic dynamics or objective function, and to formulate the seed inference problem as an optimisation problem in constraint-based logical programming (Answer Set Programming). This formalisation guarantees the completeness of the solutions, allows the enumeration of alternative minimal sets, and makes the network's implicit environmental dependencies explicit.
+
+In order to overcome the limitations inherent in a purely topological approach, Seed2LP proposes a hybridisation with flux analysis (FBA). Logically inferred seed sets can be filtered, validated or refined using stoichiometric constraints, imposing the feasibility of steady-state fluxes compatible with the production of target metabolites or growth. This articulation makes it possible to distinguish structurally sufficient seeds from those that are stoichiometrically unfeasible, and to identify dependencies induced by thermodynamically or quantitatively constrained cycles. The hybrid approach thus provides a compromise between logical completeness and biochemical realism, while maintaining formal interpretability of the solutions.
+
+The framework has been extended to the analysis of microbial communities, considering each organism as a distinct metabolic network, interconnected by exchangeable metabolites representing inter-species transfers. Seeds can then be defined at different levels: individual (environmental dependencies specific to each taxon), community (minimum resources for the entire system). Metabolic transfers are explicitly modelled as production/consumption relationships between networks, allowing the inference of trophic complementarities, cross-dependencies and syntrophy scenarios.
+ 
+
+## Individual network
+Three approaches for seed inference are implemented into Seed2LP: 
 - [**Full network**](#full-network) mode, that activates all compounds of the metabolic network.
 - [**Target**](#target) mode, that activates metabolites of interest.
-- [**FBA**](#fba) mode, that randomly searches seeds ensuring a positive flux into the objective reaction 
+- [**FBA**](#fba) mode, that randomly searches seeds ensuring a positive flux into the objective reaction, using ASP linear constraints with clingo-lpx
 
-The notebook directory of this repo contains scripts that reproduce the results presented in the associated paper. 
+> **_Mandatory inputs:_**
+> - Network file (sbml)
+> - Result directory
+
+## Community networks
+
+An extension of seed inference for [**Target**](#target) has been added, searching for set of seeds and transfers based on [**Target**](#target) mode:
+- [**Community**](#community) mode.
+
+> **_Mandatory inputs:_**
+> - Community file ; text file containing name of sbml file (without extension)
+> - SBML directory: diretory containting all possible networks
+> - Result directory
+
+## Additional features ecosystem
+
+There are also multiple additional features:
+- [**Network**](documentations/network.mkd): allows drawing the network from the ASP definition and checking the network ASP decription by comparing with the COBRApy description, or write into an SBML file the corrected network (exchanging products and reactants or deleted reaction having all boundaries to 0)
+- [**Flux**](documentations/flux.mkd): Allows checking the flux for individual network with COBRApy from Seed2LP result files, or any file having the same json structure than Seed2LP.
+- [**Flux community**](documentations/fluxcom.mkd): Allows checking the flux for community with COBRApy from Seed2LP result files, or any file having the same json structure than Seed2LP.
+- [**Scope**](documentations/scope.mkd): Perform scopes from seeds for individual network from Seed2LP result files, or any file having the same json structure than Seed2LP.
+
+## Notebooks
+
+The notebook directory of this repo contains scripts that reproduce the results presented in associated papers. 
+
+## Citation
+
+If you use **Seed2LP** in your work, please cite:
+
+- Ghassemi Nedjad C. et al.  
+  *Seed2LP: seed inference in metabolic networks for reverse ecology applications*.  
+  Bioinformatics, 2025.  
+  DOI: https://doi.org/10.1093/bioinformatics/btaf140  
+  [HAL](https://inria.hal.science/hal-05230510v1/document)  
+  [Individual dataset and code repository](https://doi.org/10.57745/OS1JND)
+
+- Ghassemi Nedjad C., Mendoza S. N., Frioux C. and Paulevé L.  
+  *Seed inference in interacting microbial communities using combinatorial optimization.*   
+  In *CMSB 2025*  
+  DOI: http://doi.org/10.1007/978-3-032-01436-8\_20  
+  [HAL](https://inria.hal.science/hal-04713829)  
+  [Community dataset and code repository](https://doi.org/10.57745/Y6KDJC)
+
+
+
+### BibTeX
+
+```bibtex
+@article{GhassemiNedjad.2025, 
+  year = {2025}, 
+  title = {{Seed2LP: seed inference in metabolic networks for reverse ecology applications}}, 
+  author = {Ghassemi-Nedjad, Chabname and Bolteau, Mathieu and Bourneuf, Lucas and Paulevé, Loïc and Frioux, Clémence}, 
+  journal = {Bioinformatics}, 
+  doi = {10.1093/bioinformatics/btaf140}, 
+  pmid = {40163742}, 
+}
+
+@inproceedings{GhassemiNedjad.2026,
+	title = {Seed {Inference} in {Interacting} {Microbial} {Communities} {Using} {Combinatorial} {Optimization}},
+	isbn = {978-3-032-01436-8},
+	booktitle = {Computational {Methods} in {Systems} {Biology}},
+	publisher = {Springer Nature Switzerland},
+	author = {Ghassemi Nedjad, Chabname and Mendoza, Sebastián Nelson and Frioux, Clémence and Paulevé, Loïc},
+	editor = {Fages, François and Pérès, Sabine},
+	year = {2026},
+	pages = {370--387},
+}
+```
 
 </br>
 <hr style="border: 4px outset" size="8" > 
 
 ## Install
+**From pypi**
+```
+pip install seed2lp
+```
 
 **From github**
 ```
@@ -32,7 +115,9 @@ python setup.py install
 
 ## Requirements
 
-Requires Python >= 3.10. 
+Requires Python >= 3.11. 
+
+Need to manually install graphviz: `conda install -c conda-forge graphviz`. If not installed and Seed2LP is launched for a graph visualisation of the network, the tool will raise an error and invite the user to install graphviz.
 
 For below requirements, installing Seed2LP will install all needed packages if not already installed.
 
@@ -42,7 +127,7 @@ For below requirements, installing Seed2LP will install all needed packages if n
 |:----------:|:-------------:|
 | [clyngor](https://github.com/Aluriak/clyngor) | 0.3.18 |
 | [clingo-lpx](https://github.com/potassco/clingo-lpx) | 1.3.0   |
-| [cobrapy](https://cobrapy.readthedocs.io/en/latest/index.html)  | 0.26.0 |
+| [COBRApy](https://COBRApy.readthedocs.io/en/latest/index.html)  | 0.26.0 |
 | [pyyaml](https://pyyaml.org/wiki/PyYAMLDocumentation) | 6.0 |
 | [menetools](https://github.com/cfrioux/MeneTools) | 3.4.0 |
 | [padmet](https://github.com/AuReMe/padmet) | 5.0.1 |
@@ -88,12 +173,10 @@ WARNING :
       
 ```
 
-## Search mode features
-It is possible to run Seed2LP for all the 3 modes ([**Full network**](#full-network), [**Target**](#target) and [**FBA**](#fba) by changing the command, and for each one to use specifics arguments.
+## Seed inference mode features
+For **_individual network_**, it is possible to run Seed2LP for all the 3 modes ([**Full network**](#full-network), [**Target**](#target) and [**FBA**](#fba) by changing the command, and for each one to use specifics arguments.
 
-There are also 2 additional features:
-- [**Network**](#network): allows drawing the network from the ASP definition and checking the network ASP decription by comparing with the Cobrapy description, or write into an SBML file the corrected network (exchanging products and reactants or delteing reaction with all boundaries to 0)
-- [**Flux**](#flux): Allows checking the flux with Cobrapy from Seed2LP result files, or any file having the same json structure than Seed2LP.
+For [**Community**](#Community), ony a [**Target**](#target) mode is performed, and arguments are availabled to choose between optimisation methods (optimise set of seeds and transfers)
 
 <br/>
 <hr style="border: 1px dotted" > 
@@ -106,12 +189,8 @@ This mode searches seeds with this goal: "activate"/"produce" all reaction/metab
 > seed2lp full [network_file] [output_directory] [arguments]
 > ```
 
-There are also two submodes:
-- 📜 [Reasoning](documentations/full_network.mkd#reasoning): Use ASP solving with clingo
-    - **Classic:** Use reasoning (logical, Boolean abstraction of metabolic activity) search only, without calculating flux into objective reaction
-  - **Filter:** Use reasoning search only, but for all results the flux is checked with [cobrapy](https://cobrapy.readthedocs.io/en/latest/index.html), and only the solutions having flux are returned.
-  - **Guess-check:** Use reasoning search and directly interact with the solver during solving by adding new constraints. Flux is checked with [cobrapy](https://cobrapy.readthedocs.io/en/latest/index.html) for every solution proposed by the solver and new constraints are derived out of it to guide the remaining solving process. All outputted solutions have flux natively.
-- 📜 [Hybrid](documentations/full_network.mkd#hybrid): Ensure the resulting model statisfies both logical and flux constraints using a hybrid ASP-LP solver.
+
+There are also different [seed inference submodes](#Seed-inference-submodes) and [optimisations](#optimisations-for-individual-network)
 
 <br/>
 <hr style="border: 1px dotted" > 
@@ -124,18 +203,13 @@ This mode searches seeds with this goal: producing a set of metabolites, or if a
 > seed2lp target [network_file] [output_directory] [arguments]
 > ```
 
-There are also two submodes:
-- 📜 [Reasoning](documentations/target.mkd): Use ASP solving with clingo
-  - **Classic:** Use reasoning (logical, Boolean abstraction of metabolic activity) search only, without calculating flux into objective reaction
-    - **Filter:** Use reasoning search only, but for all results the flux is checked with [cobrapy](https://cobrapy.readthedocs.io/en/latest/index.html), and only the solutions having flux are returned.
-    - **Guess-check:** Use reasoning search and directly interact with the solver during solving by adding new constraints. Flux is checked with [cobrapy](https://cobrapy.readthedocs.io/en/latest/index.html) for every solution proposed by the solver and new constraints are derived out of it to guide the remaining solving process. All outputted solutions have flux natively.
-- 📜 [Hybrid](documentations/target.mkd): Ensure the resulting model statisfies both logical and flux constraints using a hybrid ASP-LP solver.
+There are also [seed inference submodes](#Seed-inference-submodes) and [optimisations](#optimisations-for-individual-network)
 
 <br/>
 <hr style="border: 1px dotted" > 
 
 ### 📜 [<ins>FBA</ins>](documentations/fba.mkd)
-This mode randomly searches seeds by ensuring flux on objective reaction.
+This mode randomly searches seeds by ensuring flux on objective reaction. It ensures the resulting model statisfies both logical and flux constraints using a hybrid ASP-LP solver.
 
 > 💻 **Command:**
 >
@@ -143,11 +217,56 @@ This mode randomly searches seeds by ensuring flux on objective reaction.
 > seed2lp fba [network_file] [output_directory] [arguments]
 > ```
 
+There are also [optimisations](#optimisations-for-individual-network)
+
+<br/>
+<hr style="border: 1px dotted" > 
+
+
+### 📜 [<ins>Community</ins>](documentations/fba.mkd)
+
+
+> 💻 **Command:**
+>
+> ```
+> seed2lp community [community_file_text] [sbml_directory] [result directory]
+> ```
+
+There are also [seed inference submodes](#Seed-inference-submodes), uses only [subset minimal](#Subset-minimal) optimisation and performs different [algorithm of optimisations](#Community-optimisation-submodes) 
+
+<br/>
+<hr style="border: 1px dotted" > 
+
+
+### <ins>Seed inference submodes</ins>
+**Common for <ins>individual network</ins> and <ins>community</ins>**
+- [Reasoning](documentations/full_network.mkd#reasoning): Use ASP solving with clingo
+    - **Classic:** Use reasoning (logical, Boolean abstraction of metabolic activity) search only, without calculating flux into objective reaction.  
+     💻 **Command:** `-so reasoning`
+- Hybrids with [COBRApy](https://COBRApy.readthedocs.io/en/latest/index.html): Use ASP solving with clingo to solve seeds and check solution with [COBRApy](https://COBRApy.readthedocs.io/en/latest/index.html)
+  - **Filter:** Use reasoning search only, but for all results the flux is checked, and only the solutions having flux are returned.   
+   💻 **Command:** `-so filter`
+  - **Guess-check:** Use reasoning search and directly interact with the solver during solving by adding new constraints. Flux is checked for every solution proposed by the solver and new constraints are derived out of it to guide the remaining solving process. All outputted solutions have flux natively.   
+   💻 **Command:** `-so guess_check`
+  - **Guess-check-diversity:** Reuse **Guess-check** but also avoid a subset of current set of seeds for the next solving by adding new constraints on seeds   
+   💻 **Command:** `-so guess_check_div`
+
+![](documentations/pictures/individual_network/Hybrid.png)
+
+
+**Only for <ins>individual network</ins>**
+- Hybrid-lpx: Use ASP solving with clingo-lpx to solve seeds and check fluxes with ASP linear constraints:
+  - **Hybrid:** Ensure the resulting model statisfies both logical and flux constraints using a hybrid ASP-LP solver.  
+   💻 **Command:** `-so hybrid`
+
+
 </br>
 <hr style="border: 4px outset" size="8" > 
 
-## set-mode features
-It is possible to choose what kind of set of seeds to search.
+
+
+## Optimisations for individual network
+It is possible to choose what kind of optimisation to perform on set of seeds.
 
 ### <ins>Subset minimal</ins>
 The subset minimal (submin) mode finds a set of seeds which satisfies all the constraints, then from this set, it tries to eliminate seeds until it finds the minimal set that will satisfy the constraints.
@@ -165,6 +284,7 @@ This method of search **does not guarantee minimality** in terms of size of the 
 > | {A,D,E,F}      |     no          |{A,D,F} is a set of seeds included into this set |
 > | {A,D,F}        |     yes         | There is no other set smaller included in this set |
 > | {A,C,E,F}      |     yes         |  There is no other set smaller included in this set|
+
 
 <br/>
 <hr style="border: 1px dotted" > 
@@ -186,6 +306,24 @@ This method of search **ensures minimality**. But it is computationally more dem
 > | {A,D,F}        |     yes         | This a one of the smaller set |
 > | {A,C,E,F}      |     no          | There is a smaller set of size 3 existing|
 
+
+</br>
+<hr style="border: 4px outset" size="8" > 
+
+
+
+## Community optimisation submodes
+In community, the tool search for a set of seeds and transfers. The tool only perorm a subset minimal type of optimisations in community. Three algorithms have been implemented to optimise these sets :
+
+- **Global:** Optimisation by performing a subset minimality on set of seeds+transfers. This method do not ensures a subset minimality of seeds sets.   
+**Command:** `-cm global`
+- **Bisteps:** Optimisation by performing a subset minimality on set of seeds first, and another step find and perform a subset minimialty of transfers sets (first transfers set found). This method ensures a subset minimalisty of set of seeds.   
+**Command:** `-cm bisteps`
+- **Delete supersets:** Optimisation by performing a subset minimality on set of seeds+transfers. For each solution, a ASP constraint is added to forbid superset of current seed sets for next resolution. Also, a post check is performed to detect and delete all previous solution found which is a superset of the current set of seeds. This method approximate a subset minimalisty of set of seeds, and ensures it when all solutions are found.   
+**Command:** `-cm delsupset`
+
+![](documentations/pictures/community/solving_approaches.png)
+
 </br>
 
 </br>
@@ -194,7 +332,7 @@ This method of search **ensures minimality**. But it is computationally more dem
 ## Results
 For each mode, a result json file is created. This file will write all models for all submodes reasoning / hybrid and **set-mode** subset minimial / minimize.
 
-If the check-flux option is used, `-cf` / `--check-flux`, a tsv file is created with all the fluxes calculated with Cobrapy, and if hybrid submode or fba mode is used, the LP flux found (calculated from ASP).
+If the check-flux option is used, `-cf` / `--check-flux`, a tsv file is created with all the fluxes calculated with COBRApy, and if hybrid submode or fba mode is used, the LP flux found (calculated from ASP).
 
 The results are also written in the terminal.
 
@@ -205,7 +343,7 @@ The results are also written in the terminal.
 ### 📜 [<ins>Network</ins>](documentations/network.mkd)
 This feature can reconstruct a very basic picture of the network from the ASP conversion of the source network (in SBML format).
 - It can create the picture with the reaction names, or without the reaction.
-- It can also create all the reactions description / formula from ASP and Cobrapy and give a difference of both contents.
+- It can also create all the reactions description / formula from ASP and COBRApy and give a difference of both contents.
 - It can write an SBML file derived from the SBML sources after correction of the network
   - Deletion of reaction with boundaries [0,0]
   - Exchanging set of reactants and products when boundaries negatives: ie [-1000, 0], [-100; -10], ...
@@ -218,7 +356,7 @@ This feature can reconstruct a very basic picture of the network from the ASP co
 <hr style="border: 1px dotted" > 
 
 ### 📜 [<ins>Flux</ins>](documentations/flux.mkd)
-This feature allows the calculation, using Cobrapy library, of the flux of the objective function from a result file of seed2lp and save them. This can be a validation of the solutions provided by Seed2LP.
+This feature allows the calculation, using COBRApy library, of the flux of the objective function from a result file of seed2lp (or any file having the same JSON format) and save them. This can be a validation of the solutions provided by Seed2LP.
 
 > 💻 **Command:**
 >
@@ -228,7 +366,36 @@ This feature allows the calculation, using Cobrapy library, of the flux of the o
 
 > 📝 **Notes:**
 >
-> It is possible to do the flux calculation using Cobrapy directly after the seed search by using the argument `-cf` / `--check-flux` on each mode. A tsv file is created with all the fluxes calculated with Cobrapy, and if hybrid submode or fba mode is used, the LP flux found (calculated from ASP).
+> It is possible to do the flux calculation using COBRApy directly after the seed search by using the argument `-cf` / `--check-flux` on each mode. A tsv file is created with all the fluxes calculated with COBRApy, and if hybrid submode or fba mode is used, the LP flux found (calculated from ASP).
+
+<br/>
+<hr style="border: 1px dotted" > 
+
+### 📜 [<ins>Flux Community</ins>](documentations/fluxcom.mkd)
+
+
+This feature allows the calculation, using COBRApy library, of the flux of all objective function (for each species) from a result file of seed2lp (or any file having the same JSON format) and save them. This can be a validation of the solutions provided by Seed2LP.
+
+> 💻 **Command:**
+>
+> `seed2lp fluxcom [community_file_text] [sbml_directory] [seed2lp_result_file] [output_directory]`
+
+
+
+> 📝 **Notes:**
+>
+> It is possible to do the flux calculation using COBRApy directly after the seed search by using the argument `-cf` / `--check-flux` on each mode. A tsv file is created with all the fluxes calculated with COBRApy.
+
+<br/>
+<hr style="border: 1px dotted" > 
+
+### 📜 [<ins>Scope</ins>](documentations/scope.mkd)
+
+This feature determine scope inferred by seeeds using Network Expansion from a result file of seed2lp (or any file having the same JSON format) and save them. The scope calculation is done with [MeneTools](https://github.com/cfrioux/MeneTools).
+
+> 💻 **Command:**
+>
+> `seed2lp scope [sbml_file] [seed2lp_result_file] [output_directory]`
 
 </br>
 <hr style="border: 4px outset" size="8" > 
@@ -236,6 +403,8 @@ This feature allows the calculation, using Cobrapy library, of the flux of the o
 ## Main 📜 [options](documentations/options.mkd) for [search mode features](#search-mode-features)
 
 ### <ins>Data given by user</ins>
+
+File format described [here](documentations/options.mkd#Input-file-formats)
 
 |       option           | short|  default |  description | search mode |
 |:----------------------:|:----:|:--------:|:------------:|:-------------:|
@@ -282,6 +451,8 @@ This feature allows the calculation, using Cobrapy library, of the flux of the o
 
 ### <ins>Set of seed restrictions</ins>
 
+File format described [here](documentations/options.mkd#Input-file-formats)
+
 |       option           | short|  default |  description | search mode |
 |:----------------------:|:----:|:--------:|:------------:|:-------------:|
 | --targets-as-seeds | -tas | False | If used, targets found are given, <br/> allowed to be in the set of seeds | ALL |
@@ -306,7 +477,7 @@ This feature allows the calculation, using Cobrapy library, of the flux of the o
 
 |       option           | short|  default |  description | search mode |
 |:----------------------:|:----:|:--------:|:------------:|:-------------:|
-| --check-flux | -cf | False  | If used, the Cobrapy flux calculation <br/> from seeds will be executed and saved | ALL |
+| --check-flux | -cf | False  | If used, the COBRApy flux calculation <br/> from seeds will be executed and saved | ALL |
 |  --maximize-flux | -max | False |  If used, the flux calculation <br/> with ASP will be maximized  | ALL⭐ |
 
 
@@ -315,7 +486,15 @@ This feature allows the calculation, using Cobrapy library, of the flux of the o
 > ⭐ The option is used only in [Hybrid](documentations/hybrid.mkd) mode for [Full Network](documentations/full_network.mkd) and [Target](documentations/target.mkd) search mode features.
 
 
-</br>
+### <ins>Flux extension to community</ins>
+
+
+|       option           | short|  default |  description | search mode |
+|:----------------------:|:----:|:--------:|:------------:|:-------------:|
+| --equality-flux | -ef | False  | If used, the COBRApy flux calculation <br/> from seeds will force equality of flux <br/> between species biomass  | ALL |</br>
+
+
+
 <hr style="border: 4px outset" size="8" > 
 
 ## Configuration file
@@ -330,12 +509,49 @@ But all these configurations are overwritten by the arguments if used. The confi
 <hr style="border: 4px outset" size="8" > 
 
 ## Output files
-### Result file
+### <ins>Result file</ins>
+
+The result file is in JSON format, containing multiple blocks:
+- **OPTIONS:** Options used for seed inference (relating to import reactions, tragets as forbidden seeds, flux calculation or not, ASP accumulation allowed or not)
+- **NETWORK:** Data related to the network and type of seed inference (Network or community name, objective reactions, search mode type and solvint type)
+- **USER DATA:** Data given by the user (empty if none)
+- **RESULTS:** List of results by solving mode, optimisation mode...
+
+For more details please check [output files documentation](documentations/output_files.mkd)
 
 <br/>
 <hr style="border: 1px dotted" > 
 
-### Flux file
+### <ins>Flux file</ins>
+The flux file is in tsv format, containing multiple column, such as:
+- Name of network or community
+- List of biomass reaction
+- List of seeds
+- Initial flux of network
+- Flux after deleting import reaction
+- Flux after applying new seeds
+- other informations (type of seed detections, optimisations ...)
+
+For more details please check [output files documentation](documentations/output_files.mkd)
+
+<br/>
+<hr style="border: 1px dotted" > 
+
+### <ins>Logs file</ins>
+Into the result directory, a logs repository is created by Seed2LP, containing a log file for each result file generated. This files contains all modification done on networks, all steps performed and all solutions found.
+
+It is possible to get more information by using the command: `--verbose`
+
+
+```
+WARNING : 
+
+If a exactly same execution is performed (same network, seed search, optimisation, and all possible main options), the log file will be overwrite
+      
+```
+
+
+For more details please check [output files documentation](documentations/output_files.mkd)
 
 
 </br>

@@ -13,7 +13,7 @@
 #   - facts (str): Conversion sbml into asp facts
 #   - fluxes (list): List of flux check on all set of seeds
 
-import os
+import os, logging
 import pandas as pd
 from .reaction import Reaction
 import seed2lp.sbml as SBML
@@ -22,7 +22,7 @@ from . import flux
 from .resmod import Resmod
 from time import time
 from . import color
-from . import logger
+from .logger import print_log
 from .file import existant_path
 import xml.etree.ElementTree as ET
 import copy
@@ -68,7 +68,8 @@ class NET_TITLE:
 ###################################################################
 class NetBase:
     def __init__(self, targets_as_seeds:bool=False, use_topological_injections:bool=False, 
-                 keep_import_reactions:bool=True, accumulation:bool=False, equality_flux:bool=False):
+                 keep_import_reactions:bool=True, accumulation:bool=False, equality_flux:bool=False,
+                 verbose:bool=False):
         """Initialize Object NetBase
 
         Args:
@@ -77,6 +78,8 @@ class NetBase:
             keep_import_reactions (bool): Import reactions are not removed
             accumulation (bool, optional): Is accumulation authorized. Defaults to False.
         """
+        self.logger = logging.getLogger("s2lp")
+
         self.targets_as_seeds = targets_as_seeds
         self.use_topological_injections = use_topological_injections
         self.keep_import_reactions = keep_import_reactions
@@ -122,6 +125,7 @@ class NetBase:
         self.used_meta = dict()
 
         self.equality_flux=equality_flux
+        self.verbose=verbose
 
     ######################## GETTER ########################
     def _get_reactions(self):
@@ -154,7 +158,7 @@ class NetBase:
     def get_objective_reactant(self, ojective_name:str, species:str):
         """Get the objective reactants from SBML file
         """
-        logger.log.info("Finding list of reactants from opbjective reaction...")
+        self.logger.info("Finding list of reactants from opbjective reaction...")
         reactants = SBML.get_listOfReactants_from_name(self.model[species], ojective_name)
         for reactant in reactants:
             react_name = prefixed_name = reactant.attrib.get('species')
@@ -164,7 +168,7 @@ class NetBase:
                 self.targets[react_name] = [prefixed_name]
             else:
                 self.targets[react_name].append(prefixed_name)
-        logger.log.info("... DONE") 
+        self.logger.info("... DONE") 
 
 
     def get_boundaries(self, reaction, species:str):
@@ -223,7 +227,7 @@ class NetBase:
             self.is_objective_error = True
             raise ValueError(f"No objective reaction found or none has coefficient 1\n")
         else:
-            logger.print_log(f'Objective found for {species}: {color.bold}{obj_found_name}{color.reset}', "info")
+            print_log(self.logger, f'Objective found for {species}: {color.bold}{obj_found_name}{color.reset}', "info", verbose=self.verbose)
             if lbound == 0 and ubound == 0:
                 self.is_objective_error = True
                 raise ValueError(f"Lower and upper boundaries are [0,0] \nfor objetive reaction {obj_found_name}\n")
@@ -388,31 +392,6 @@ class NetBase:
         reactions_list = self._get_reactions()
         reactions_list.append(reaction)
         self._set_reactions(reactions_list)
-
-
-    # def prefix_id_network(self, name:str, species:str="", type_element:str=""):
-    #     """Prefix Reaction or Metbolite by the network name (filename) if the tool is used for community.
-    #     For single network, nothing is prefixed.
-
-    #     Args:
-    #         name (str): ID of the element
-    #         species (str, optional): Network name (from filename). Defaults to "".
-    #         type_element: (str, optional): "reaction" or "metabolite" or no type. Defaults to "".
-
-    #     Returns:
-    #         str: The name prfixed by the network if needed
-    #     """
-    #     match self.is_community, type_element:
-    #         case True,"reaction":
-    #             return sub("^R_", f"R_{species}_",name)
-    #         case True,"metabolite":
-    #             return sub("^M_", f"M_{species}_",name)
-    #         case True,"metaid":
-    #             return sub("^meta_R_", f"meta_R_{species}_",name)
-    #         case True,_:
-    #             return f"{species}_{name}"
-    #         case _,_:
-    #             return name
 
 
     def get_network(self, species:str, to_print:bool=True, 
@@ -585,12 +564,12 @@ class NetBase:
             if warning_message :
                 if not self.is_community or ( self.is_community and warning_message != species):
                     warning_message += "\n"
-                    logger.log.warning(warning_message)
+                    self.logger.warning(warning_message)
             if info_message:
-                logger.log.info(info_message)
+                self.logger.info(info_message)
         else:
-            logger.log.info(warning_message)
-            logger.log.info(info_message)
+            self.logger.info(warning_message)
+            self.logger.info(info_message)
             print("____________________________________________\n")
 
 
@@ -632,7 +611,7 @@ class NetBase:
     def convert_to_facts(self):
         """Convert the corrected Network into ASP facts
         """
-        logger.log.info("Converting Network into ASP facts ...")
+        self.logger.info("Converting Network into ASP facts ...")
         facts = ""
         # Upper bound does not change on forward reaction
         
@@ -654,7 +633,7 @@ class NetBase:
             facts += f'\np_seed({quoted(possible)}).'
 
         self.facts = facts
-        logger.log.info("... DONE")
+        self.logger.info("... DONE")
 
 
     def simplify(self):
@@ -832,11 +811,12 @@ class NetBase:
                                        'has_flux_demands', 'timer'])
         fluxes = fluxes.astype(dtypes)
         
+        
         if self.objectives_reaction_name:
             if self.result_seeds:
-                logger.log.info("Check fluxes Starting")
+                self.logger.info("Check fluxes Starting")
                 model = flux.get_model(self.file)
-                fluxes_init = flux.get_init(model, self.objectives_reaction_name)
+                fluxes_init = flux.get_init(model, self.objectives_reaction_name, self.logger)
                 if not self.keep_import_reactions:
                     fluxes_no_import = flux.stop_flux(model, self.objectives_reaction_name)
                 self.model[self.name] = model
@@ -846,7 +826,7 @@ class NetBase:
                 print(color.purple+"____________________________________________")
                 print("____________________________________________\n"+color.reset)
 
-                logger.log.warning("Processing in parallel. " \
+                self.logger.warning("Processing in parallel. " \
                 "\nNo outputs will be shown. " \
                 "\nPlease wait ...\n")
 
@@ -889,7 +869,7 @@ class NetBase:
                             # Check if the search mode has changed
                             if prev_search_mode == None or result.search_mode != prev_search_mode:
                                 if has_warning:
-                                    logger.log.warning(WARNING_MESSAGE_LP_COBRA)
+                                    self.logger.warning(WARNING_MESSAGE_LP_COBRA)
                                 prev_search_mode = search_mode
                                 prev_solver_type = None
                             if prev_solver_type != solver_type:
@@ -901,14 +881,14 @@ class NetBase:
                             fluxes = pd.concat([fluxes, result_flux], ignore_index=True)
 
                         if has_warning:
-                            logger.log.warning(WARNING_MESSAGE_LP_COBRA)
+                            self.logger.warning(WARNING_MESSAGE_LP_COBRA)
                 else:
                     for result in self.result_seeds :
 
                         if prev_search_mode == None or result.search_mode != prev_search_mode:
                             if has_warning:
                                 print("\n")
-                                logger.log.warning(WARNING_MESSAGE_LP_COBRA)
+                                self.logger.warning(WARNING_MESSAGE_LP_COBRA)
                             print(color.yellow+"\n____________________________________________")
                             print("____________________________________________\n"+color.reset)
                             print(result.search_mode.center(44))
@@ -954,7 +934,7 @@ class NetBase:
                     
                     if has_warning:
                         print("\n")
-                        logger.log.warning(WARNING_MESSAGE_LP_COBRA)
+                        self.logger.warning(WARNING_MESSAGE_LP_COBRA)
                     print(color.yellow+"\n____________________________________________\n"+color.reset)
                 
             else:
@@ -970,7 +950,7 @@ class NetBase:
         Args:
             data (dict): Json data from previous seed2lp result file
         """
-        logger.log.info("Converting data from result file ...")
+        self.logger.info("Converting data from result file ...")
         reaction_option = data["OPTIONS"]["REACTION"]
         match reaction_option:
             case "Remove Import Reaction":
@@ -988,7 +968,13 @@ class NetBase:
         else:
             self.accumulation = False
 
-        self.objectives_reaction_name = data["NETWORK"]["OBJECTIVE"]
+
+        if self.is_community:
+            self.objectives_reaction_name = [item[1] for item in data["NETWORK"]["OBJECTIVE"]]
+
+        else:
+            self.objectives_reaction_name = [data["NETWORK"]["OBJECTIVE"][0][1]]
+
  
         if data["NETWORK"]["SEARCH_MODE"] in NET_TITLE.CONVERT_TITLE_MODE:
             self.run_mode = NET_TITLE.CONVERT_TITLE_MODE[data["NETWORK"]["SEARCH_MODE"]]
@@ -1037,7 +1023,7 @@ class NetBase:
                             transferred_list = None
                         self.add_result_seeds(solver_type_transmetted, search_info, name, size, seeds_list,
                                               obj_flux_lp, transferred_list=transferred_list)
-        logger.log.info("... DONE")
+        self.logger.info("... DONE")
         return maximize, solve
 
                    
@@ -1056,26 +1042,26 @@ class NetBase:
         print(f"TARGETS".center(44)) 
         print(f"FOR TARGET MODE AND FBA".center(44)) 
         print("____________________________________________\n") 
-        logger.print_log(tgt_message, "info")
+        print_log(self.logger, tgt_message, "info", verbose=self.verbose)
 
         print("\n____________________________________________\n")
         print(f"OBJECTVE".center(44)) 
         print(f"FOR HYBRID".center(44)) 
         print("____________________________________________\n") 
-        logger.print_log(obj_message, "info")
+        print_log(self.logger, obj_message, "info", verbose=self.verbose)
         print("\n")
 
 
         print("\n____________________________________________\n")
         print(f"NETWORK".center(44)) 
         print("____________________________________________\n")
-        logger.print_log(net_mess[0], "info")
+        print_log(self.logger, net_mess[0], "info", verbose=self.verbose)
         if self.keep_import_reactions:
-            logger.print_log(net_mess[1], "info")
+            print_log(self.logger, net_mess[1], "info", verbose=self.verbose)
         if self.run_mode != "full":
-            logger.print_log(net_mess[2], "info")
+            print_log(self.logger, net_mess[2], "info", verbose=self.verbose)
         if self.run_mode != "fba":
-            logger.print_log(net_mess[3], "info")
+            print_log(self.logger, net_mess[3], "info", verbose=self.verbose)
         print("\n")
 
 
@@ -1090,7 +1076,7 @@ class NetBase:
             bool: Return if the objective reaction has flux (True) or not (False)
         """
         model = flux.get_model(self.file)
-        flux.get_init(model, self.objectives_reaction_name, False)
+        flux.get_init(model, self.objectives_reaction_name, self.logger, False)
         flux.stop_flux(model, self.objectives_reaction_name, False)
 
         result = Resmod(None, self.objectives_reaction_name, 
@@ -1342,7 +1328,7 @@ class NetBase:
 class Network(NetBase):
     def __init__(self, file:str, run_mode:str=None, targets_as_seeds:bool=False, use_topological_injections:bool=False, 
                  keep_import_reactions:bool=True, input_dict:dict=None, accumulation:bool=False, to_print:bool=True, 
-                 write_sbml:bool=False):
+                 write_sbml:bool=False, verbose:bool=False):
         """Initialize Object Network
 
         Args:
@@ -1358,7 +1344,7 @@ class Network(NetBase):
         """
 
         super().__init__(targets_as_seeds, use_topological_injections, 
-                 keep_import_reactions, accumulation)
+                 keep_import_reactions, accumulation, verbose=verbose)
         self.file = file
         self.run_mode = run_mode
         self.file_extension = ""
@@ -1373,11 +1359,12 @@ class Network(NetBase):
 
         # Instatiate objectives from target file if given by user
         is_user_objective = self.check_objectives(input_dict)
+        
         # Find objectives on sbml file is not given
         is_reactant_found=False
         is_objective_error=False
         
-        logger.print_log("\nFinding objective ...", "info")
+        print_log(self.logger, "\nFinding objective ...", "info")
         if self.objectives is None or not self.objectives:
             try:
                 is_reactant_found = self.find_objectives(input_dict, self.name)
@@ -1385,19 +1372,19 @@ class Network(NetBase):
                 #     self.objectives_reaction_name.append(obj[1])
             except ValueError as e:
                 is_objective_error = True
-                logger.log.error(str(e))
+                self.logger.error(str(e))
         # Init networks with data given by user and objective reaction
         # write messages
         if self.run_mode is not None:
             # write console messages
             self.init_with_inputs(input_dict, is_reactant_found, is_objective_error, is_user_objective)
 
-        logger.print_log("Network normalisation in progress...", "info")
-        logger.print_log("Can take several minutes", "info")
+        print_log(self.logger, "Network normalisation in progress...", "info", verbose=self.verbose)
+        print_log(self.logger, "Can take several minutes", "info", verbose=self.verbose)
         normalisation_time = time()
         self.get_network(self.name, to_print, write_sbml)
         normalisation_time = time() - normalisation_time
-        logger.print_log(f"Normalisation total time: {round(normalisation_time, 3)}s", "info")
+        print_log(self.logger, f"Normalisation total time: {round(normalisation_time, 3)}s", "info", verbose=self.verbose)
         
 
 
@@ -1410,7 +1397,7 @@ class Netcom(NetBase):
     def __init__(self, comfile:str, sbmldir:str, temp_dir:str, run_mode:str=None, run_solve:str=None, community_mode:str=None,
                  targets_as_seeds:bool=False, use_topological_injections:bool=False, keep_import_reactions:bool=True, 
                  input_dict:dict=None, accumulation:bool=False, to_print:bool=True, 
-                 write_sbml:bool=False, equality_flux:bool=False):
+                 write_sbml:bool=False, equality_flux:bool=False, verbose:bool=False):
         """Initialise Object Netcom
 
         Args:
@@ -1427,7 +1414,7 @@ class Netcom(NetBase):
             write_sbml (bool, optional):  Is a writing SBML file mode or not. Defaults to False.
         """
         super().__init__(targets_as_seeds, use_topological_injections, 
-                        keep_import_reactions, accumulation, equality_flux)
+                        keep_import_reactions, accumulation, equality_flux, verbose=verbose)
         self.name=""
         self.comfile = comfile
         self.sbml_dir = sbmldir
@@ -1458,14 +1445,14 @@ class Netcom(NetBase):
         # Find objectives on sbml file is not given
         is_reactant_found=False
         is_objective_error=False
-        logger.print_log("\n Finding objectives of community ...", "info")
+        print_log(self.logger, "\n Finding objectives of community ...", "info", verbose=self.verbose)
         if self.objectives is None or not self.objectives:
             for species in self.species:
                 try:
                     is_reactant_found = self.find_objectives(input_dict, species)
                 except ValueError as e:
                     is_objective_error = True
-                    logger.log.error(str(e))
+                    self.logger.error(str(e))
 
         # Init networks with data given by user and objective reaction
         # write messages
@@ -1473,14 +1460,14 @@ class Netcom(NetBase):
             # write console messages
             self.init_with_inputs(input_dict, is_reactant_found, is_objective_error, is_user_objective)
 
-        logger.print_log("Network normalisation in progress ...", "info")
+        print_log(self.logger, "Network normalisation in progress ...", "info", verbose=self.verbose)
         normalisation_time = time()
         for species in self.species:
             self.get_network(species, to_print, write_sbml)
 
         self.write_merge_sbml_file()
         normalisation_time = time() - normalisation_time
-        logger.print_log(f"Normalisation total time: {round(normalisation_time, 3)}s", "info")
+        print_log(self.logger, f"Normalisation total time: {round(normalisation_time, 3)}s", "info", verbose=self.verbose)
         
 
  
@@ -1518,7 +1505,7 @@ class Netcom(NetBase):
                 existant_path(sbml_file)
                 self.files.append(sbml_file)
             except FileNotFoundError as e :
-                logger.log.error(str(e))
+                self.logger.error(str(e))
                 exit(1)
             self.sbml[species], self.sbml_first_line, self.default_namespace = SBML.get_root(sbml_file)
             self.fbc[species] = SBML.get_fbc(self.sbml[species])

@@ -1,8 +1,9 @@
-import cobra
+import cobra, logging
 from re import sub
 from cobra.core import Model
 import warnings
-from . import logger, color
+from . import color #,logger
+from .logger import print_log
 
 def get_model(model_file:str):
     """Get cobra model
@@ -41,7 +42,8 @@ def get_list_fluxes(model:Model, list_objective:list, show_messages:bool=True):
             objective_flux = 0.0
         fluxes_dict[objective_reaction]=objective_flux
     if show_messages:
-        print(fluxes_dict)
+        for reaction, flux in fluxes_dict.items():
+            print(f"'{reaction}': {float(flux)}")
         print('\n')
     return fluxes_dict
 
@@ -79,6 +81,7 @@ def get_flux(model:Model, objective_reaction:str, list_objective:list,
     Returns:
         float, bool: The value of the objective flux, if the model is infeasible or not
     """
+    logger = logging.getLogger("s2lp")
     warnings.filterwarnings("error")
     objective_flux=dict()
     try:
@@ -157,12 +160,12 @@ def get_flux(model:Model, objective_reaction:str, list_objective:list,
             objective = remove_prefix_reaction(obj)
             objective_flux[objective]=0
         infeasible = True
-        logger.log.info("Model infeasible")
+        logger.info("Model infeasible")
         
     return objective_flux, infeasible
 
 
-def get_init(model:Model, list_objective:list, show_messages:bool=True):
+def get_init(model:Model, list_objective:list, logger:logging, show_messages:bool=True):
     """Get initial flux of all objective reactions using cobra
 
     Args:
@@ -179,7 +182,7 @@ def get_init(model:Model, list_objective:list, show_messages:bool=True):
             f"                 {color.bold}CHECK FLUX{color.cyan_light}\n"\
             "############################################\n" \
             "############################################\n"
-        logger.print_log(title_mess, "info", color.cyan_light) 
+        print_log(logger, title_mess, "info", color.cyan_light) 
 
     
         print("---------------- FLUX INIT -----------------\n")
@@ -204,9 +207,11 @@ def stop_flux(model:Model, list_objective:list=None, show_messages:bool=True):
     Returns:
         dic: Dictionnary of objective reaction and their respective fluxes
     """
+    logger = logging.getLogger("s2lp")
+
     if show_messages:
         print("---------- STOP IMPORT FLUX -------------\n") 
-    logger.log.info("Shutting down import flux ...")
+    logger.info("Shutting down import flux ...")
 
     for elem in model.boundary:
         if not elem.reactants and elem.upper_bound > 0:
@@ -218,7 +223,7 @@ def stop_flux(model:Model, list_objective:list=None, show_messages:bool=True):
                 elem.upper_bound = 0
             elem.lower_bound = 0.0
 
-    logger.log.info("... DONE")
+    logger.info("... DONE")
 
     if list_objective is not None:
         fluxes_no_import = get_list_fluxes(model, list_objective, show_messages)
@@ -242,10 +247,11 @@ def calculate(model:Model, list_objective:list, list_seeds:list,
     Returns:
         dict, str: result (containing the data), objective_reaction (chosen, the first having flux)
     """
+    logger = logging.getLogger("s2lp")
     warnings.filterwarnings("error")
-    logger.log.info("Starting calculate Flux...")
+    logger.info("Starting calculate Flux...")
     if not list_objective:
-        logger.log.error("No objective found, abort")
+        logger.error("No objective found, abort")
         return None, None
     
     #cobra.flux_analysis.add_loopless(model)
@@ -266,7 +272,7 @@ def calculate(model:Model, list_objective:list, list_seeds:list,
             meta_exchange_list[str(key)]=reaction.id
 
     created_sinks = []
-    logger.log.info("Opening Import flux from seeds (Exchange) or add Sinks ...")
+    logger.info("Opening Import flux from seeds (Exchange) or add Sinks ...")
     objective_reaction = set_objective(model, list_objective[0])
 
     for seed in list_seeds:
@@ -300,9 +306,9 @@ def calculate(model:Model, list_objective:list, list_seeds:list,
                                         lb=float(-1000))
                 created_sinks.append(f"SK_{seed}")
         
-    logger.log.info("Opening Import flux: Done")
+    logger.info("Opening Import flux: Done")
 
-    logger.log.info("Checking objective flux on seeds ...")
+    logger.info("Checking objective flux on seeds ...")
     
     lp_flux=None
     if not is_community:
@@ -322,9 +328,9 @@ def calculate(model:Model, list_objective:list, list_seeds:list,
     infeasible_demands=None
     if ok_seeds:
         ok_result = True
-        logger.log.info("... OK")
+        logger.info("... OK")
     elif try_demands:
-        logger.log.info("... KO - Checking objective flux on demands ...")
+        logger.info("... KO - Checking objective flux on demands ...")
         # create a demand reaction for all products of the biomass reaction
         products = [m.id for m in model.reactions.get_by_id(objective_reaction).products]
         for m in products:
@@ -349,9 +355,9 @@ def calculate(model:Model, list_objective:list, list_seeds:list,
         
         if ok_demands:
             ok_result = True
-            logger.log.info("... OK")
+            logger.info("... OK")
         else:
-            logger.log.info("... KO")
+            logger.info("... KO")
 
     result = {'id' : species,
             'objective_flux_seeds': objective_flux_seeds,

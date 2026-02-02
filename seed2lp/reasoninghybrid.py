@@ -3,7 +3,8 @@ from .network import Network
 from multiprocessing import Process, Queue
 from .file import save, delete, write_instance_file, load_tsv, existing_file
 import clingo
-from . import color, logger
+from . import color
+from .logger import init_logger, print_log
 from os import path
 import random
 from time import time
@@ -13,7 +14,7 @@ from json import loads
 ############# Class HybridReasoning : herit Solver ################ 
 ###################################################################
 class HybridReasoning(Solver):
-    def __init__(self, run_mode:str, network:Network,
+    def __init__(self, run_mode:str, network:Network, log_path:str,
                  time_limit_minute:float=None, number_solution:int=None, 
                  clingo_configuration:str=None, clingo_strategy:str=None, 
                  intersection:bool=False, union:bool=False, 
@@ -37,7 +38,7 @@ class HybridReasoning(Solver):
             short_option (str, optional): Short way to write option on filename. Defaults to None.
             verbose (bool, optional): Set debug mode. Defaults to False.
         """
-        super().__init__(run_mode, network, time_limit_minute, number_solution, clingo_configuration, 
+        super().__init__(run_mode, network, log_path, time_limit_minute, number_solution, clingo_configuration, 
                          clingo_strategy, intersection, union, minimize, subset_minimal, 
                          temp_dir, short_option, run_solve, verbose, community_mode)
         
@@ -76,7 +77,7 @@ class HybridReasoning(Solver):
             ctrl.ground([("diversity",[])])
 
         self.get_message("command")
-        logger.print_log('clingo ' + ' '.join(full_option) + ' ' + ' '.join(asp_files), 'debug')
+        print_log(self.logger, 'clingo ' + ' '.join(full_option) + ' ' + ' '.join(asp_files), 'debug', verbose=self.verbose)
         return ctrl
     
 
@@ -385,9 +386,9 @@ class HybridReasoning(Solver):
                                 solution_list[solution[0]] = sol
                             #get the last occurence pf rejected solutions number
                             number_rejected = solution[3]
-                    logger.print_log(f'Rejected solution during process: at least {number_rejected} \n', 'info')
+                    print_log(self.logger, f'Rejected solution during process: at least {number_rejected} \n', 'info', verbose=self.verbose)
                 except Exception as e:
-                    logger.print_log(f"An error occured while reading temporary file\n {full_path}:\n {e}", 'error')
+                    print_log(self.logger, f"An error occured while reading temporary file\n {full_path}:\n {e}", 'error', verbose=self.verbose)
 
                 if any(solution_list):
                     for name in solution_list:
@@ -453,7 +454,7 @@ class HybridReasoning(Solver):
             else:
                 time_out = True
             if time_out:
-                logger.print_log(f'Time out: {self.time_limit_minute} min expired', "error")
+                print_log(self.logger, f'Time out: {self.time_limit_minute} min expired', "error", self.verbose)
             
             solution_list, number_rejected = self.get_solution_from_temp(unsat, is_one_model, full_path, suffix, search_mode)
         p.terminate()
@@ -461,10 +462,10 @@ class HybridReasoning(Solver):
 
         if is_one_model:
             if not self.optimum_found:
-                logger.print_log('Optimum not found', "error") 
+                print_log(self.logger, 'Optimum not found', "error", self.verbose) 
         else:
             if not any(solution_list): 
-                logger.print_log('Unsatisfiable problem', "error")
+                print_log(self.logger, 'Unsatisfiable problem', "error", self.verbose)
 
         return time_solve, time_ground, solution_list, number_rejected
     
@@ -528,6 +529,9 @@ class HybridReasoning(Solver):
             is_one_model (bool, optional): Define if the solution we want is to fin the optimum when minimize is used (before enumration).
                                          Defaults to False.
         """
+        # Init logger for child process
+        init_logger(self.log_path, self.verbose)
+
         solution_list = dict()
 
         no_limit_solution = False
@@ -554,7 +558,7 @@ class HybridReasoning(Solver):
                         res = self.network.check_seeds(seeds, trans_solution_list)
                         if res[0]:
                             # valid solution
-                            logger.print_log(f'CHECK Solution {size} seeds -> OK\n', 'debug')
+                            print_log(self.logger, f'CHECK Solution {size} seeds -> OK\n', 'debug', verbose=self.verbose)
                             
                             message = color.cyan_light + f"Answer: {solution_idx}{color.reset} ({size} seeds{transf_short})\n"
                             self.print_answer(message, seeds, seeds_full, trans_complete)
@@ -567,7 +571,7 @@ class HybridReasoning(Solver):
                             self.network.add_result_seeds('REASONING FILTER', search_mode, name, size, seeds, flux_cobra=res[1], transferred_list=trans_solution_list)
                             solution_idx +=1
                         else:
-                            logger.print_log(f'CHECK Solution {size} seeds -> KO\n', 'debug')
+                            print_log(self.logger, f'CHECK Solution {size} seeds -> KO\n', 'debug', verbose=self.verbose)
                             number_rejected +=1
                             current_timer = time() - start_time
                             # write all 100 rejected 
@@ -588,7 +592,7 @@ class HybridReasoning(Solver):
                 else:
                     break
             
-        logger.print_log(f'Rejected solution during process: {number_rejected} \n', "info")
+        print_log(self.logger, f'Rejected solution during process: {number_rejected} \n', "info", verbose=self.verbose)
 
         stats = ctrl.statistics
         total_time = stats["summary"]["times"]["total"]
@@ -598,10 +602,10 @@ class HybridReasoning(Solver):
         # Because it is needed to get all answers from clingo to have optimum, we save it after
         # No minimize in community mode
         if is_one_model and self.optimum_found:
-            logger.print_log(f"Optimum found.", "info") 
+            print_log(self.logger, f"Optimum found.", "info", verbose=self.verbose) 
             if self.network.is_subseed:
-                logger.print_log(f"Number of producible targets: {- self.opt_prod_tgt}", "info")
-            logger.print_log(f"Minimal size of seed set is {self.opt_size}\n", "info")
+                print_log(self.logger, f"Number of producible targets: {- self.opt_prod_tgt}", "info", verbose=self.verbose)
+            print_log(self.logger, f"Minimal size of seed set is {self.opt_size}\n", "info", verbose=self.verbose)
             save(full_path, self.temp_dir, solution_temp, "tsv", True)               
             self.network.add_result_seeds('REASONING FILTER', search_mode, name, size, seeds, flux_cobra=res[1], transferred_list=trans_solution_list) 
 
@@ -662,6 +666,9 @@ class HybridReasoning(Solver):
             is_one_model (bool, optional): Define if the solution we want is to fin the optimum when minimize is used (before enumration).
                                          Defaults to False.
         """
+        # Init logger for child process
+        init_logger(self.log_path, self.verbose)
+
         solution_list = dict()
         avoided = []
         all_time_solve = 0
@@ -724,7 +731,7 @@ class HybridReasoning(Solver):
             all_time_ground += float(time_ground)
             res = self.network.check_seeds(seeds, trans_solution_list)
             if res[0]:
-                logger.print_log(f'CHECK Solution {size} seeds -> OK\n', 'debug')
+                print_log(self.logger, f'CHECK Solution {size} seeds -> OK\n', 'debug', verbose=self.verbose)
                 # valid solution
                 if not is_one_model:
                     message = color.cyan_light + f"Answer: {solution_idx}{color.reset} ({size} seeds{transf_short})\n"
@@ -743,26 +750,24 @@ class HybridReasoning(Solver):
                     name = 'model_one_solution'
                     solution_list, solution_temp = self.complete_solutions(solution_list, name, size, seeds, 
                            trans_solution_list, res[1], number_rejected)
-                    logger.print_log(f"Optimum found.", "info") 
+                    print_log(self.logger, f"Optimum found.", "info", verbose=self.verbose) 
                     self.optimum_found = True
-                    mode = 'REASONING GUESS-CHECK'
+                    mode = self.get_gc_mode()
                     # Do not exclude superset because we will rerun the minimize by set the size
                     # and we want to find back this first minimize found
                     if self.diversity: 
                         ctrl, avoided = self.add_diversity(ctrl, seeds, avoided) 
-                        mode =  'REASONING GUESS-CHECK DIVERSITY'
                     save(full_path, self.temp_dir, solution_temp, "tsv", True)
-
                     self.network.add_result_seeds(mode, search_mode, name, size, seeds, flux_cobra=res[1], transferred_list=trans_solution_list)
                     self.get_separate_optimum()
                     if self.network.is_subseed:
-                        logger.print_log(f"Number of producible targets: {- self.opt_prod_tgt}", "info")
-                    logger.print_log(f"Minimal size of seed set is {self.opt_size}\n", "info")
+                        print_log(self.logger, f"Number of producible targets: {- self.opt_prod_tgt}", "info", verbose=self.verbose)
+                    print_log(self.logger, f"Minimal size of seed set is {self.opt_size}\n", "info", verbose=self.verbose)
                     break
                 
             else:
-                logger.print_log(f'CHECK Solution {size} seeds -> KO\n', 'debug')
-                #logger.print_log(f'{seeds}\n', 'debug')
+                print_log(self.logger, f'CHECK Solution {size} seeds -> KO\n', 'debug', verbose=self.verbose)
+                #print_log(self.logger, f'{seeds}\n', 'debug')
                 
                 ctrl, avoided= self.guess_check_constraints(ctrl, atoms, seeds, avoided)
                 mode = self.get_gc_mode()
@@ -782,7 +787,7 @@ class HybridReasoning(Solver):
 
         if not is_one_model:
             save(full_path, "", solution_temp, "tsv", True)
-            logger.print_log(f'Rejected solution during process: {number_rejected} \n', 'info')
+            print_log(self.logger, f'Rejected solution during process: {number_rejected} \n', 'info', verbose=self.verbose)
 
         ctrl.cleanup()
         ctrl.interrupt()

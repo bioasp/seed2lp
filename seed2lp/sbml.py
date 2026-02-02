@@ -1,9 +1,10 @@
 """Routines to extract information from SBML files.
 
 """
+import logging
 import xml.etree.ElementTree as ET
 from re import sub, match, search
-from . import logger
+#from . import logger
 
 def register_all_namespaces(file:str):
     """Get namespaces for rewriting SBML file
@@ -245,6 +246,7 @@ def get_used_metabolites(filename, call_log=False)-> set:
     Returns:
         used_metabolites (set): Set of used metabolites
     """
+    logger = logging.getLogger("s2lp")
     tree = ET.parse(filename)
     sbml = tree.getroot()
     model = get_model(sbml)
@@ -262,7 +264,7 @@ def get_used_metabolites(filename, call_log=False)-> set:
         ubound =  parameters[reaction.attrib.get('{'+fbc+'}upperFluxBound')]
         lbound = parameters[reaction.attrib.get('{'+fbc+'}lowerFluxBound')]
         if float(ubound) == 0 and float(lbound) == 0  and call_log:
-            logger.log.warning(f"Reaction {reaction.attrib['id']} deleted, boudaries [0,0]")
+            logger.warning(f"Reaction {reaction.attrib['id']} deleted, boudaries [0,0]")
             continue
         else:
             reactants,_ = get_listOfReactants(reaction,"",False)

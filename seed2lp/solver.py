@@ -18,11 +18,12 @@
 #    - timer_list (dict): List of all timers to find solution
 #    - verbose (bool): Set debug mode
 
+import logging
 from os import path
 from .network import  Network
 from .file import write_instance_file
 from dataclasses import dataclass
-from . import logger
+from .logger import print_log
 from . import color
 
 
@@ -63,7 +64,7 @@ class GROUNDING:
 ########################## Class  Solver ########################## 
 ###################################################################
 class Solver:
-    def __init__(self, run_mode:str, network:Network, 
+    def __init__(self, run_mode:str, network:Network, log_path:str,
                  time_limit_minute:float=None, number_solution:int=None, 
                  clingo_configuration:str=None, clingo_strategy:str=None,
                  intersection:bool=False, union:bool=False, 
@@ -89,11 +90,13 @@ class Solver:
             verbose (bool, optional): Set debug mode. Defaults to False.
         """
 
+        self.logger = logging.getLogger("s2lp")
         self.is_linear:bool
         self.asp = ASP_CLINGO()
         self.ground = GROUNDING().GROUND
         self.run_mode = run_mode
         self.network = network
+        self.log_path = log_path
         self.time_limit_minute = time_limit_minute
         self.set_time_limit()
         self.number_solution = number_solution
@@ -170,7 +173,7 @@ class Solver:
         self.network.instance_file = path.join(self.temp_dir,f'{filename}.lp')
         write_instance_file(self.network.instance_file, self.network.facts)
         self.asp_files.append(self.network.instance_file)
-        logger.log.info(f"Instance file written: {self.network.instance_file}")
+        self.logger.info(f"Instance file written: {self.network.instance_file}")
 
     
     def _set_temp_result_file(self):
@@ -230,41 +233,41 @@ class Solver:
         self.clingo_constant = ['-c']
         match self.run_mode:
             case 'target':
-                logger.print_log("Mode : TARGET", "info")
+                print_log(self.logger, "Mode : TARGET", "info")
                 if not self.network.targets_as_seeds:  
-                    logger.print_log('Option: TARGETS ARE FORBIDDEN SEEDS', "info")
-                logger.print_log(f'Search seeds validating the {len(self.network.targets)} targets…','debug')
+                    print_log(self.logger, 'Option: TARGETS ARE FORBIDDEN SEEDS', "info", verbose=self.verbose)
+                print_log(self.logger, f'Search seeds validating the {len(self.network.targets)} targets…','debug', verbose=self.verbose)
                 self.clingo_constant.append('run_mode=target')
             case 'full':
-                logger.print_log("Mode : FULL NETWORK", "info")
-                logger.print_log("Search seeds validating all metabolites as targets…",'debug')
+                print_log(self.logger, "Mode : FULL NETWORK", "info", verbose=self.verbose)
+                print_log(self.logger, "Search seeds validating all metabolites as targets…",'debug', verbose=self.verbose)
                 self.clingo_constant.append('run_mode=full')
             case 'fba':
-                logger.print_log("Mode : FBA", "info")
+                print_log(self.logger, "Mode : FBA", "info", verbose=self.verbose)
                 if not self.network.targets_as_seeds:  
-                    logger.print_log('Option: TARGETS ARE FORBIDDEN SEEDS', "info")
-                    logger.print_log('Info: Targets are reactant of objective', "info")
-                logger.print_log("Search seeds aleatory…",'debug')
+                    print_log(self.logger, 'Option: TARGETS ARE FORBIDDEN SEEDS', "info", verbose=self.verbose)
+                    print_log(self.logger, 'Info: Targets are reactant of objective', "info", verbose=self.verbose)
+                print_log(self.logger, "Search seeds aleatory…",'debug')
                 self.clingo_constant.append('run_mode=fba')
             case 'community':
                 match self.community_mode:
                     case "global":
-                        logger.print_log("Community Mode : Global Subset Minimal", "info")
+                        print_log(self.logger, "Community Mode : Global Subset Minimal", "info", verbose=self.verbose)
                     case "bisteps":
-                        logger.print_log("Community Mode : Bisteps Subset Minimal", "info")
+                        print_log(self.logger, "Community Mode : Bisteps Subset Minimal", "info", verbose=self.verbose)
                     case "delsupset":
-                        logger.print_log("Community Mode : Delete superset of seeds", "info")
+                        print_log(self.logger, "Community Mode : Delete superset of seeds", "info", verbose=self.verbose)
                 if not self.network.targets_as_seeds:  
-                    logger.print_log('Option: TARGETS ARE FORBIDDEN SEEDS', "info")
-                logger.print_log(f'Search seeds validating the {len(self.network.targets)} targets…','debug')
+                    print_log(self.logger, 'Option: TARGETS ARE FORBIDDEN SEEDS', "info", verbose=self.verbose)
+                print_log(self.logger, f'Search seeds validating the {len(self.network.targets)} targets…','debug', verbose=self.verbose)
                 self.clingo_constant.append('run_mode=target')
 
         if self.network.accumulation:
-            logger.print_log('ACCUMULATION: Authorized', "info")
+            print_log(self.logger, 'ACCUMULATION: Authorized', "info", verbose=self.verbose)
             self.clingo_constant.append('-c')
             self.clingo_constant.append('accu=1')
         else:
-            logger.print_log('ACCUMULATION: Forbidden', "info")
+            print_log(self.logger, 'ACCUMULATION: Forbidden', "info", verbose=self.verbose)
             self.clingo_constant.append('-c')
             self.clingo_constant.append('accu=0')
     
@@ -291,43 +294,43 @@ class Solver:
         """
         match mode:
             case 'subsetmin':
-                logger.print_log("\n____________________________________________","info",color.purple)  
-                logger.print_log("____________________________________________\n", "info",color.purple)
-                logger.print_log(f"Sub Mode: {color.bold}SUBSET MINIMAL{color.reset}".center(55), "info")
-                logger.print_log("____________________________________________", "info",color.purple)
-                logger.print_log("____________________________________________\n", "info",color.purple)
+                print_log(self.logger, "\n____________________________________________","info",color.purple)  
+                print_log(self.logger, "____________________________________________\n", "info",color.purple)
+                print_log(self.logger, f"Sub Mode: {color.bold}SUBSET MINIMAL{color.reset}".center(55), "info")
+                print_log(self.logger, "____________________________________________", "info",color.purple)
+                print_log(self.logger, "____________________________________________\n", "info",color.purple)
             case "minimize":
-                logger.print_log("\n____________________________________________","info",color.purple)
-                logger.print_log("____________________________________________\n", "info",color.purple)   
-                logger.print_log(f"Sub Mode: {color.bold}MINIMIZE{color.reset}".center(55), "info")
-                logger.print_log("____________________________________________", "info",color.purple) 
-                logger.print_log("____________________________________________\n", "info",color.purple) 
+                print_log(self.logger, "\n____________________________________________","info",color.purple)
+                print_log(self.logger, "____________________________________________\n", "info",color.purple)   
+                print_log(self.logger, f"Sub Mode: {color.bold}MINIMIZE{color.reset}".center(55), "info")
+                print_log(self.logger, "____________________________________________", "info",color.purple) 
+                print_log(self.logger, "____________________________________________\n", "info",color.purple) 
             case "one solution":
-                logger.print_log(f"\n~~~~~~~~~~~~~~~ {color.bold}One solution{color.reset} ~~~~~~~~~~~~~~~", "info") 
+                print_log(self.logger, f"\n~~~~~~~~~~~~~~~ {color.bold}One solution{color.reset} ~~~~~~~~~~~~~~~", "info") 
             case "intersection":
-                logger.print_log(f"\n~~~~~~~~~~~~~~~ {color.bold}Intersection{color.reset} ~~~~~~~~~~~~~~~", "info") 
+                print_log(self.logger, f"\n~~~~~~~~~~~~~~~ {color.bold}Intersection{color.reset} ~~~~~~~~~~~~~~~", "info") 
             case "enumeration":
-                logger.print_log(f"\n~~~~~~~~~~~~~~~~ {color.bold}Enumeration{color.reset} ~~~~~~~~~~~~~~~", "info")
+                print_log(self.logger, f"\n~~~~~~~~~~~~~~~~ {color.bold}Enumeration{color.reset} ~~~~~~~~~~~~~~~", "info")
             case "union":
-                logger.print_log(f"\n~~~~~~~~~~~~~~~~~~~ {color.bold}Union{color.reset} ~~~~~~~~~~~~~~~~~~", "info") 
+                print_log(self.logger, f"\n~~~~~~~~~~~~~~~~~~~ {color.bold}Union{color.reset} ~~~~~~~~~~~~~~~~~~", "info") 
             case "end":
-                logger.print_log('############################################\n\n', "info", color.cyan_light)
+                print_log(self.logger, '############################################\n\n', "info", color.cyan_light)
             case "optimum error":
-                logger.print_log("\n____________________________________________","info") 
-                logger.print_log('ABORTED: No objective funcion found \
+                print_log(self.logger, "\n____________________________________________","info") 
+                print_log(self.logger, 'ABORTED: No objective funcion found \
                                     \nPlease correct the SBML file to contain either \
                                     \n    - a function with "BIOMASS" (not case sensiive) in the name \
                                     \n    - a function in the objective list', "error")
             case "command":
-                logger.print_log("                Command", "debug")
+                print_log(self.logger, "                Command", "debug")
             case "classic":
-                logger.print_log(f"\n················ {color.bold}Classic mode{color.reset} ···············", "info") 
+                print_log(self.logger, f"\n················ {color.bold}Classic mode{color.reset} ···············", "info") 
             case "filter":
-                logger.print_log(f"\n················ {color.bold}Filter mode{color.reset} ···············", "info")  
+                print_log(self.logger, f"\n················ {color.bold}Filter mode{color.reset} ···············", "info")  
             case "guess_check":
-                logger.print_log(f"\n·············· {color.bold}Guess-Check mode{color.reset} ············", "info")  
+                print_log(self.logger, f"\n·············· {color.bold}Guess-Check mode{color.reset} ············", "info")  
             case "guess_check_div":
-                logger.print_log(f"\n····· {color.bold}Guess-Check with diversity mode{color.reset} ······", "info")  
+                print_log(self.logger, f"\n····· {color.bold}Guess-Check with diversity mode{color.reset} ······", "info")  
 
    
     

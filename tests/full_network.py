@@ -6,7 +6,7 @@ Description:
 Test seed2lp
 """
 from os import path
-from tests.utils import search_seed
+from .utils import search_seed
 
 ################ DIRECTORIES AND FILES ###################
 TEST_DIR = path.dirname(path.abspath(__file__))

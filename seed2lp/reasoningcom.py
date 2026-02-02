@@ -6,7 +6,7 @@ from . import color, logger
 from multiprocessing import Process, Queue
 from os import path
 from json import loads
-
+from .logger import init_logger, print_log
 
 USE_MULTIPROCESSING=True
 
@@ -14,7 +14,7 @@ USE_MULTIPROCESSING=True
 ################# Class Reasoning : herit Solver ################## 
 ###################################################################
 class ComReasoning(Reasoning):
-    def __init__(self, run_mode:str, run_solve:str, network:Network,
+    def __init__(self, run_mode:str, run_solve:str, network:Network, log_path:str,
                  time_limit_minute:float=None, number_solution:int=None, 
                  clingo_configuration:str=None, clingo_strategy:str=None, 
                  intersection:bool=False, union:bool=False, 
@@ -39,7 +39,7 @@ class ComReasoning(Reasoning):
             short_option (str, optional): Short way to write option on filename. Defaults to None.
             verbose (bool, optional): Set debug mode. Defaults to False.
         """
-        super().__init__(run_mode, run_solve, network,
+        super().__init__(run_mode, run_solve, network, log_path,
                         time_limit_minute, number_solution, 
                         clingo_configuration, clingo_strategy, 
                         intersection, union, 
@@ -114,6 +114,9 @@ class ComReasoning(Reasoning):
         Returns:
             solution_list (dict): a dictionnary of all found solutions
         """
+
+        # Init logger for child process
+        init_logger(self.log_path, self.verbose)
        
         cobra_flux=None
         # Guess_check or Guess_check diversity mode   
@@ -197,12 +200,12 @@ class ComReasoning(Reasoning):
                             res = self.network.check_seeds(seeds, trans_solution_list)
                             if res[0]:
                                 # valid solution
-                                logger.print_log(f'CHECK Solution {size_seeds} seeds -> OK\n', 'debug')
+                                print_log(self.logger, f'CHECK Solution {size_seeds} seeds -> OK\n', 'debug', verbose=self.verbose)
                                 cobra_flux=res[1]
                                 self.network.add_result_seeds(mode, "Community bisteps", 'model_'+str(idx), size_seeds, seeds, flux_cobra=cobra_flux, transferred_list=trans_solution_list)
                                 keep_solution=True
                             else:
-                                logger.print_log(f'CHECK Solution {size_seeds} seeds -> KO\n', 'debug')
+                                print_log(self.logger, f'CHECK Solution {size_seeds} seeds -> KO\n', 'debug', verbose=self.verbose)
                                 number_rejected +=1
                                 keep_solution=False
                                 current_timer = time() - start_time
@@ -240,12 +243,12 @@ class ComReasoning(Reasoning):
     
 
         if step != "classic":
-            logger.print_log(f'Rejected solution during process: {number_rejected} \n', "info")
+            print_log(self.logger, f'Rejected solution during process: {number_rejected} \n', "info", verbose=self.verbose)
         else:
             number_rejected=None
 
         if not any(solution_list): 
-            logger.print_log('Unsatisfiable problem', "error")
+            print_log(self.logger, 'Unsatisfiable problem', "error", verbose=self.verbose)
             
         if USE_MULTIPROCESSING:
             queue.put([self, solution_list, None, current_timer, number_rejected])
@@ -336,15 +339,19 @@ class ComReasoning(Reasoning):
 
         Args:
             full_option (list): All Clingo option 
-            solution_list (dict): _description_
+            solution_list (dict): Dictionnary containg the solutions
             step (str): step solving mode (classic, filter, guess_check, guess_check_div).
             asp_files (list):  List of needed ASP files to solve ASP (Clingo package)
             queue (Queue, optional): Queue for multiprocessing program (managing time limit). Defaults to None.
             full_path (str, optional):  Full path of temporary solution file. Defaults to None.
 
         Returns:
-            _type_: _description_
+            list, int: List of solutions and numer of rejected solutions
         """
+
+        # Init logger for child process
+        init_logger(self.log_path, self.verbose)
+
         all_time_solve = 0
         all_time_ground = 0
         dict_by_size_seeds=dict()
@@ -396,11 +403,11 @@ class ComReasoning(Reasoning):
                         res = self.network.check_seeds(seeds, trans_solution_list)
                         if res[0]:
                             # valid solution
-                            logger.print_log(f'CHECK Solution {size} seeds -> OK\n', 'debug')
+                            print_log(self.logger, f'CHECK Solution {size} seeds -> OK\n', 'debug', verbose=self.verbose)
                             cobra_flux=res[1]
                             keep_solution=True
                         else:
-                            logger.print_log(f'CHECK Solution {size} seeds -> KO\n', 'debug')
+                            print_log(self.logger, f'CHECK Solution {size} seeds -> KO\n', 'debug', verbose=self.verbose)
                             number_rejected +=1
                             keep_solution=False
                             current_timer = time() - start_time
@@ -477,7 +484,7 @@ class ComReasoning(Reasoning):
             solution_list = self.add_print_solution(solution_list, dict_by_size_seeds, mode, cobra_flux)
 
         if step != "classic":
-            logger.print_log(f'Rejected solution during process: {number_rejected} \n', "info")
+            print_log(self.logger, f'Rejected solution during process: {number_rejected} \n', "info", verbose=self.verbose)
         else:
             number_rejected=None
 
@@ -590,13 +597,13 @@ class ComReasoning(Reasoning):
                     number_rejected = solution[3]
 
             except Exception as e:
-                logger.print_log(f"An error occured while reading temporary file\n {full_path}:\n {e}", 'error')
+                print_log(self.logger, f"An error occured while reading temporary file\n {full_path}:\n {e}", 'error', self.verbose)
 
             if any(solution_list):
                 solution_list = self.add_print_solution(solution_list, dict_by_size_seeds, mode, flux_cobra) 
 
             if step != "classic":
-                logger.print_log(f'Rejected solution during process: at least {number_rejected} \n', 'info')
+                print_log(self.logger, f'Rejected solution during process: at least {number_rejected} \n', 'info', self.verbose)
 
         delete(full_path)
         return solution_list, number_rejected
@@ -642,7 +649,7 @@ class ComReasoning(Reasoning):
             else:
                 time_out = True
             if time_out:
-                logger.print_log(f'Time out: {self.time_limit_minute} min expired', "error")
+                print_log(self.logger, f'Time out: {self.time_limit_minute} min expired', "error", verbose=self.verbose)
 
             match step:
                 case "classic":
@@ -659,7 +666,7 @@ class ComReasoning(Reasoning):
         queue.close()
 
         if not any(solution_list): 
-            logger.print_log('Unsatisfiable problem', "error")
+            print_log(self.logger, 'Unsatisfiable problem', "error", verbose=self.verbose)
 
         if time_ground != None:
             if time_ground != -1:
@@ -694,10 +701,10 @@ class ComReasoning(Reasoning):
                 match search_mode, step:
                     # CLASSIC MODE (NO FILTER, NO GUESS-CHECK)   
                     case "minimize-enumeration" | "minimize-one-model", _:
-                        logger.print_log("No minimisation in community", "warning")
+                        print_log(self.logger, "No minimisation in community", "warning", verbose=self.verbose)
 
                     case "submin-enumeration", _:
-                        logger.print_log("SOLVING...\n", "info")
+                        print_log(self.logger, "SOLVING...\n", "info", verbose=self.verbose)
                         if USE_MULTIPROCESSING:
                             self.run_multiprocess(full_option, solution_list, step, asp_files, timer, output_type, suffix, search_mode)
                         else :
@@ -727,13 +734,13 @@ class ComReasoning(Reasoning):
                 match search_mode, step:
                     # CLASSIC MODE (NO FILTER, NO GUESS-CHECK)   
                     case "minimize-enumeration" | "minimize-one-model", _:
-                        logger.print_log("No minimisation in community", "warning")
+                        print_log(self.logger, "No minimisation in community", "warning", verbose=self.verbose)
 
                     # Because of specific analyse of solution with "manual deletion of previous superset"
                     # All solving mode are in one function (classic, filter, guess check and gues check div)
                     # unlike all other community modes (or signle network modes)
                     case "submin-enumeration", "classic" | "filter" | "guess_check" | "guess_check_div":
-                        logger.print_log("SOLVING...\n", "info")
+                        print_log(self.logger, "SOLVING...\n", "info", verbose=self.verbose)
                         
                         # Time limit may not work well if no solutions found within time limit
                         # But save time from writting into temporary file

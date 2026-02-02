@@ -1,13 +1,14 @@
 import logging, logging.config
+from logging import Logger
 from os import path
 from . import color, file
 import yaml
 from ._version import __version__
 
-ROJECT_DIR = path.dirname(path.abspath(__file__))
-LOG_DIR:str
-log:logging.Logger
-verbose:bool
+PROJECT_DIR = path.dirname(path.abspath(__file__))
+#LOG_DIR:str
+#log:logging.Logger
+#verbose:bool
 
 COLORS = {
     "WARNING": color.yellow,
@@ -36,34 +37,71 @@ class ColoredFormatter(logging.Formatter):
     
 
 
-def __init_logger__(log_path:str):
-    """Init logger depending on log_path (and therefor run_mode)
+# def __init_logger_2__(log_path:str, verbose:bool=False):
+#     """Init logger depending on log_path (and therefor run_mode)
+
+#     Args:
+#         log_path (str): Full path of logger file
+#     """
+#     global log
+#     #logging.config.fileConfig(path.join(ROJECT_DIR,'log_conf.yaml'))
+#     with open(path.join(ROJECT_DIR,'log_conf.yaml'), "rt") as f:
+#         config = yaml.safe_load(f.read())
+#         if verbose:
+#             config['handlers']['console']['level']='DEBUG'
+#         logging.config.dictConfig(config)
+#     formatter = logging.Formatter('%(levelname)s %(asctime)s: %(message)s')
+#     file_handler = logging.FileHandler(log_path)
+
+#     if verbose:
+#         file_handler.setLevel(logging.DEBUG)
+#     else:
+#         file_handler.setLevel(logging.INFO)
+#     file_handler.setFormatter(formatter)
+
+#     # create logger
+#     log = logging.getLogger('s2lp')
+#     log.addHandler(file_handler)
+
+
+def init_logger(log_path: str, verbose: bool = False):
+    """Init logger depending on log_path (and therefor run_mode). Return a logger
+    needed for multiprocessing.
 
     Args:
         log_path (str): Full path of logger file
-    """
-    global log
-    #logging.config.fileConfig(path.join(ROJECT_DIR,'log_conf.yaml'))
-    with open(path.join(ROJECT_DIR,'log_conf.yaml'), "rt") as f:
-        config = yaml.safe_load(f.read())
-        if verbose:
-            config['handlers']['console']['level']='DEBUG'
-        logging.config.dictConfig(config)
-    formatter = logging.Formatter('%(levelname)s %(asctime)s: %(message)s')
-    file_handler = logging.FileHandler(log_path)
+        verbose (bool, optional): Uses verbose mode. Defaults to False.
 
-    if verbose:
-        file_handler.setLevel(logging.DEBUG)
-    else:
-        file_handler.setLevel(logging.INFO)
+    Returns:
+        logging.Logger: logger
+    """
+    logger = logging.getLogger("s2lp")
+
+    if getattr(logger, "_configured", False):
+        return logger
+
+    # Console (YAML)
+    with open(path.join(PROJECT_DIR, "log_conf.yaml"), "rt") as f:
+        config = yaml.safe_load(f)
+        if verbose:
+            config["handlers"]["console"]["level"] = "DEBUG"
+        logging.config.dictConfig(config)
+
+    # Fichier (par process)
+    file_handler = logging.FileHandler(log_path)
+    file_handler.setLevel(logging.DEBUG if verbose else logging.INFO)
+    formatter = logging.Formatter(
+        "%(levelname)s %(asctime)s [%(processName)s]: %(message)s"
+    )
     file_handler.setFormatter(formatter)
 
-    # create logger
-    log = logging.getLogger('s2lp')
-    log.addHandler(file_handler)
+    logger.addHandler(file_handler)
+
+    logger._configured = True
+    return logger
 
 
-def print_log(message:str, level:str, col=None):
+def print_log(logger: logging.Logger, message:str, level:str, col=None, verbose:bool=False):
     """Print and log messages
 
     Args:
@@ -81,32 +119,38 @@ def print_log(message:str, level:str, col=None):
     match level:
         case "info":
             if col:
-                log.info(message,  extra={"color": col})
+                logger.info(message,  extra={"color": col})
             else:
-                log.info(message)
+                logger.info(message)
         case "debug":
-            log.debug(message)
+            logger.debug(message)
         case "warning":
-            log.warning(message)
+            logger.warning(message)
         case "error":
-            log.error(message)
+            logger.error(message)
 
 
 
-def get_logger(sbml_file:str, short_option:str, debug:bool=False):
-    global log
-    global verbose
-    verbose=debug
-    net_name = f'{path.splitext(path.basename(sbml_file))[0]}'
-    filename = f'{net_name}_{short_option}.log'
-    log_path = path.join(LOG_DIR, filename)
+# def get_logger(sbml_file:str, short_option:str, verbose:bool=False) -> logging.Logger:
+#     net_name = f'{path.splitext(path.basename(sbml_file))[0]}'
+#     filename = f'{net_name}_{short_option}.log'
+#     log_path = path.join(LOG_DIR, filename)
+#     if file.existing_file(log_path):
+#         file.delete(log_path)
+#     logger=__init_logger__(log_path, verbose)
+#     logger.info(f"Seed2LP version: {__version__}")
+#     return logger
+
+def get_logger(log_dir:str, sbml_file: str, short_option: str, verbose: bool = False):
+    net_name = path.splitext(path.basename(sbml_file))[0]
+    filename = f"{net_name}_{short_option}.log"
+    log_path = path.join(log_dir, filename)
+
     if file.existing_file(log_path):
         file.delete(log_path)
-    __init_logger__(log_path)
-    log.info(f"Seed2LP version: {__version__}")
+
+    logger = init_logger(log_path, verbose)
+    logger.info("Seed2LP version: %s", __version__)
+    return logger, log_path
 
 
-def set_log_dir(value):
-    global LOG_DIR
-    LOG_DIR = value
-    

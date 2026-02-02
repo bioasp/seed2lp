@@ -589,7 +589,7 @@ def cli_parser() -> argparse.ArgumentParser:
           - Write the reactants of the given objectve (-o/--objective) into a file
         """,
         usage="""
-        seed2lp conf [output_directory] \n 
+        seed2lp objective_targets [output_directory] \n 
         """
     )
 
@@ -624,7 +624,7 @@ def cli_parser() -> argparse.ArgumentParser:
           - guess_check_div: Guess check but also forbids subset of seed as next result in order to reduce intersection of solutions
         """,
         usage="""
-        seed2lp community community_file_text sbml_directory result directory \n 
+        seed2lp community [community_file_text] [sbml_directory] [result_directory] \n 
         """
     )
 
@@ -643,7 +643,7 @@ def cli_parser() -> argparse.ArgumentParser:
         Can be used for other tool results if the results file has the same json structure.
         """,
         usage="""
-        seed2lp fluxcom community_file_text sbml_directory seed2lp_result_file output_directory \n 
+        seed2lp fluxcom [community_file_text] [sbml_directory] [seed2lp_result_file] [output_directory] \n 
         """
     )
 
