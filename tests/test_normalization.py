@@ -8,6 +8,11 @@ Test seed2lp
 from os import path
 from .utils import get_network
 import re
+import tempfile
+
+import pytest
+
+from seed2lp.description import Description
 
 ##### ###### ##### DIRECTORIES AND FILES ###################
 TEST_DIR = path.dirname(path.abspath(__file__))
@@ -53,10 +58,10 @@ RM_RXN = ['rm_reaction("rev_R_EX_S1").',
         ]
 SIZE_RM_RXN=len(RM_RXN)
 
-SEED_TI = ['seed("M_S1_e","exchange","M_S1_e").',
-        'seed("M_S2_e","exchange","M_S2_e").',
-        'seed("M_C_c","exchange","M_C_c").',
-        'seed("M_G_c","exchange","M_G_c").'
+SEED_TI = ['seed("M_S1_e","exchange","M_S1_e","toy_paper").',
+        'seed("M_S2_e","exchange","M_S2_e","toy_paper").',
+        'seed("M_C_c","exchange","M_C_c","toy_paper").',
+        'seed("M_G_c","exchange","M_G_c","toy_paper").'
         ]
 SIZE_SEED_TI=len(SEED_TI)
 
@@ -186,3 +191,64 @@ def test_tas():
                     topological_injection, keep_import_reactions)
     # check if list is empty
     assert not network.forbidden_seeds
+
+
+def test_rewrite_sbml_is_cobra_readable_with_notes_and_groups_regression():
+    cobra = pytest.importorskip("cobra")
+
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        in_file = path.join(tmp_dir, "toy_paper_groups_notes.sbml")
+
+        with open(INFILE, "r", encoding="utf-8") as fh:
+            source = fh.read()
+
+        # Add groups namespace on root and one intentionally stale member idRef.
+        source = source.replace(
+            'fbc:required="false">',
+            'fbc:required="false" xmlns:groups="http://www.sbml.org/sbml/level3/version1/groups/version1" groups:required="false">',
+            1,
+        )
+
+        source = source.replace(
+            '<reaction id="R_R1" name="R_R1" reversible="true" fbc:upperFluxBound="cobra_default_ub" fbc:lowerFluxBound="cobra_default_lb">',
+            '<reaction id="R_R1" name="R_R1" reversible="true" fbc:upperFluxBound="cobra_default_ub" fbc:lowerFluxBound="cobra_default_lb">\n'
+            '                <notes><html xmlns="http://www.w3.org/1999/xhtml"><body><p>regression note</p></body></html></notes>',
+            1,
+        )
+
+        source = source.replace(
+            '    </model>',
+            '        <groups:listOfGroups>\n'
+            '            <groups:group groups:id="g1" groups:kind="partonomy">\n'
+            '                <groups:listOfMembers>\n'
+            '                    <groups:member groups:idRef="R_R2"/>\n'
+            '                </groups:listOfMembers>\n'
+            '            </groups:group>\n'
+            '        </groups:listOfGroups>\n'
+            '    </model>',
+            1,
+        )
+
+        with open(in_file, "w", encoding="utf-8") as fh:
+            fh.write(source)
+
+        desc = Description(
+            file=in_file,
+            keep_import_reactions=False,
+            out_dir=tmp_dir,
+            write_file=True,
+        )
+        desc.rewrite_sbml_file()
+
+        out_file = path.join(tmp_dir, "toy_paper_groups_notes.xml")
+        model, errors = cobra.io.validate_sbml_model(out_file)
+
+        with open(out_file, "r", encoding="utf-8") as fh:
+            rewritten = fh.read()
+
+        assert model is not None
+        assert len(errors["COBRA_FATAL"]) == 0
+        assert len(errors["COBRA_ERROR"]) == 0
+        assert rewritten.count(' xmlns="http://www.sbml.org/sbml/level3/version1/core"') == 1
+        assert "groups:listOfGroups" not in rewritten
+        assert "<notes>" not in rewritten

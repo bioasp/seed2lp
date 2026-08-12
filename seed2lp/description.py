@@ -400,8 +400,9 @@ class Description(Network):
         self.sbml_review_parameters(species)
 
 
-        def_ns=self.default_namespace.split("=")
-        self.sbml[species].set(def_ns[0], def_ns[1].replace('"',''))
+        self.sbml_prepare_for_export(self.sbml[species])
+        if self.default_namespace:
+            self.sbml[species].set("xmlns", self.default_namespace)
 
         file_path = path.join(self.out_dir, self.name+".xml") 
         str_model =  self.sbml_first_line+SBML.etree_to_string(self.sbml[species])

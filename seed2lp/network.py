@@ -107,6 +107,10 @@ class NetBase:
         self.facts = ""
         self.meta_exchange_list = list()
         self.meta_transport_list = list()
+        # targets normally forbidden as seeds, but re-authorized because no
+        # surviving reaction can produce them anymore (see
+        # get_unproducible_target_seeds())
+        self.meta_authorized_seed_list = list()
         self.meta_other_list = list()
         # metabolite of import reaction having multiple metabolite such as None -> A+B
         self.meta_multiple_import_list = list()
@@ -560,6 +564,14 @@ class NetBase:
             if  write_sbml and reaction.is_exchange and not self.keep_import_reactions:
                 self.update_network_sbml(reaction)
 
+        # review_tag_metabolite() only rescues a metabolite tagged "transport" when it is
+        # involved in a single reaction (a direct dead end). A metabolite with several
+        # compartment variants (e.g. an _e/_c/_p relay) can have all of its variants stuck as
+        # "transport" without any of them being used in only one reaction, in which case none
+        # gets rescued and the whole group becomes impossible to select as seed. This resolves
+        # those remaining groups.
+        self.resolve_isolated_transport_components()
+
         if (to_print):
             if warning_message :
                 if not self.is_community or ( self.is_community and warning_message != species):
@@ -606,6 +618,109 @@ class NetBase:
                 if meta_list_opposite[0].type == "transport":
                     metabolite.type = "other"
                     self.meta_transport_list.remove(metabolite.id_meta)
+
+
+    def resolve_isolated_transport_components(self):
+        """Rescue metabolites left tagged "transport" that can never be selected as seed
+        because every compartment variant of that same metabolite (same root id) is also
+        tagged "transport", with none tagged "exchange" or "other" to reach from.
+
+        review_tag_metabolite() already rescues a metabolite used in a single reaction,
+        provided its only transport partner is also "transport". This covers groups of any
+        size: metabolites are grouped by their root id (same grouping already used to detect
+        transport reactions in the first place, rsplit('_', 1)[0], so no new naming
+        assumption is introduced). For each group where every known variant of that root id
+        is still tagged "transport" (none escaped to "exchange" or "other"), the variant with
+        the fewest reaction occurrences is retagged "other" - the same criterion (fewest
+        occurrences, i.e. closest to a dead end) already used for the single-reaction case.
+        Ties are broken on the metabolite id for a deterministic, reproducible choice.
+        """
+        transport_by_root = dict()
+        for id_meta in self.meta_transport_list:
+            root = id_meta.rsplit('_', 1)[0]
+            transport_by_root.setdefault(root, []).append(id_meta)
+
+        all_variants_by_root = dict()
+        for id_meta in self.used_meta:
+            root = id_meta.rsplit('_', 1)[0]
+            all_variants_by_root.setdefault(root, set()).add(id_meta)
+
+        for root, transport_ids in transport_by_root.items():
+            if set(transport_ids) != all_variants_by_root[root]:
+                # At least one compartment variant of this metabolite escaped the
+                # "transport" tag (exchange or other): still reachable through it.
+                continue
+
+            chosen = min(transport_ids, key=lambda node: (len(self.used_meta[node]), node))
+            self.meta_transport_list.remove(chosen)
+            for reaction in self.reactions:
+                for metabolite in reaction.reactants + reaction.products:
+                    if metabolite.id_meta == chosen:
+                        metabolite.type = "other"
+
+
+    def get_unproducible_target_seeds(self):
+        """Authorize target metabolites as seeds when normalization removed the
+        only reaction(s) able to produce them.
+
+        Targets are forbidden as seeds by default (see self.targets_as_seeds,
+        applied in __main__.initiate_results()), which is correct as long as
+        some surviving reaction can still produce them. But normalization also
+        deletes reactions it heuristically treats as pure imports/exchanges
+        (single-metabolite reactions, see get_network()) - and that heuristic
+        can also catch internal, no-substrate pseudo-reactions used by some
+        genome-scale reconstructions to mark whole processes, e.g.:
+            R_dreplication: -> M_dnarep[c]   (no reactant at all)
+        If M_dnarep[c] is also a biomass precursor (a target) and this was its
+        only producer, forbidding it as a seed makes the model permanently
+        unreachable through no fault of the model - a false UNSAT, not a real
+        one. On purpose, this does NOT special-case the reaction (rejected:
+        models are hand-edited and don't reliably follow SBO/compartment
+        conventions) - instead it checks reachability directly: if nothing can
+        produce a target anymore, it has to be authorized as a seed.
+
+        A metabolite counts as "produced" by a surviving, non-objective
+        reaction if it is one of its products, or one of its reactants when
+        the reaction is reversible (a reversible reaction also produces its
+        reactants in the reverse direction - see Reaction.convert_to_facts,
+        which emits a "rev_" fact for reversible reactions).
+
+        Matching is done on metabolite .name rather than .id_meta: .name is
+        shared across species while .id_meta is community-prefixed (e.g.
+        "M_glc__D_c" vs "M_speciesA_glc__D_c"), and self.targets is itself
+        keyed by .name. Matching on .name also approximates the ASP-level
+        community transfer mechanism (asp/community_search.lp), where a
+        metabolite produced by one species can activate the same-named
+        metabolite in another species - e.g. if species A can produce
+        "M_dnarep[c]" and species B cannot, this authorizes B's copy too,
+        mirroring what a transfer would do anyway. It is only an
+        approximation: it ignores the "pool" species and the
+        transported_meta guard used there to cut down combinatorics. That's
+        fine here since this method only ever grants permission to be a
+        seed, never forces it - ASP still decides whether it's actually used.
+
+        Returns:
+            list: metabolite names authorized as seeds (self.targets keys),
+            also stored on self.meta_authorized_seed_list.
+        """
+        producers = set()
+        for reaction in self.reactions:
+            if reaction.name in self.objectives_reaction_name or reaction.name in self.deleted_reactions:
+                continue
+            producers.update(m.name for m in reaction.products)
+            if reaction.reversible:
+                producers.update(m.name for m in reaction.reactants)
+
+        self.meta_authorized_seed_list = [target for target in self.targets if target not in producers]
+
+        message = ""
+        for target in self.meta_authorized_seed_list:
+            message += (f"\n - {target}: authorized as seed despite being a target."
+                        f"\n     Only reachable through a removed reaction, required by the objective (topological short-circuit).")
+        if message:
+            self.logger.warning(message)
+
+        return self.meta_authorized_seed_list
 
 
     def convert_to_facts(self):
@@ -1317,6 +1432,32 @@ class NetBase:
                     new_node.attrib['value'] = str(value)
                     el.append(new_node)
 
+
+    def sbml_prepare_for_export(self, sbml_root:ET.Element):
+        """Prepare a normalized SBML tree before serialization.
+
+        Notes and groups extension content are removed to keep export compatible
+        with Cobra/libSBML after reaction deletions and rewrites.
+        """
+
+        # Remove all <notes> nodes to avoid invalid XHTML namespace propagation.
+        for parent in sbml_root.iter():
+            for child in list(parent):
+                if SBML.get_sbml_tag(child) == "notes":
+                    parent.remove(child)
+
+        model = SBML.get_model(sbml_root)
+        if model is not None:
+            # groups:listOfGroups may contain stale idRef after reaction filtering.
+            for child in list(model):
+                if SBML.get_sbml_tag(child) == "listOfGroups":
+                    model.remove(child)
+
+        # Drop groups:required on root if present since groups extension is removed.
+        for attr_name in list(sbml_root.attrib):
+            if attr_name.startswith("{") and attr_name.endswith("}required") and "groups/version1" in attr_name:
+                del sbml_root.attrib[attr_name]
+
 ################################################################### 
 
 
@@ -1383,15 +1524,16 @@ class Network(NetBase):
         print_log(self.logger, "Can take several minutes", "info", verbose=self.verbose)
         normalisation_time = time()
         self.get_network(self.name, to_print, write_sbml)
+        self.get_unproducible_target_seeds()
         normalisation_time = time() - normalisation_time
         print_log(self.logger, f"Normalisation total time: {round(normalisation_time, 3)}s", "info", verbose=self.verbose)
-        
+
 
 
 
 
 ###################################################################
-################## Class NetCom : herit NetBase ################### 
+################## Class NetCom : herit NetBase ###################
 ###################################################################
 class Netcom(NetBase):
     def __init__(self, comfile:str, sbmldir:str, temp_dir:str, run_mode:str=None, run_solve:str=None, community_mode:str=None,
@@ -1464,6 +1606,12 @@ class Netcom(NetBase):
         normalisation_time = time()
         for species in self.species:
             self.get_network(species, to_print, write_sbml)
+
+        # Unlike resolve_isolated_transport_components() (called once per
+        # species inside get_network()), this needs the full, merged
+        # cross-species reaction list to be correct - it must run once,
+        # after every species has been normalized, not per species.
+        self.get_unproducible_target_seeds()
 
         self.write_merge_sbml_file()
         normalisation_time = time() - normalisation_time
@@ -1688,8 +1836,9 @@ class Netcom(NetBase):
                 merged_model.attrib["id"]=self.name
                 new_sbml.remove(self.model[species])
                 new_sbml.append(merged_model)
-                def_ns=self.default_namespace.split("=")
-                new_sbml.set(def_ns[0], def_ns[1].replace('"',''))
+                self.sbml_prepare_for_export(new_sbml)
+                if self.default_namespace:
+                    new_sbml.set("xmlns", self.default_namespace)
                 is_first=False
             else:
                 self.append_model(merged_model, species)

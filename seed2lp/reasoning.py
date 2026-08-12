@@ -178,7 +178,7 @@ class Reasoning(HybridReasoning):
                 print_log(self.logger, (f"Number of producible targets: {- self.opt_prod_tgt}"), 'info', self.verbose)
             print_log(self.logger, f"Minimal size of seed set is {self.opt_size}\n", 'info', self.verbose)
             if self.opt_size > 0:
-                seeds = [args[0] for args in one_model.get('seed', ())]
+                seeds = [self._normalize_seed(args[0]) for args in one_model.get('seed', ())]
                 seeds=list(sorted(seeds))
             else:
                 seeds = []
@@ -273,6 +273,40 @@ class Reasoning(HybridReasoning):
         return suffix
 
 
+    def _run_clyngor(self, options:str, asp_files:list=None, nb_model:int=None):
+        """Run clyngor while preferring the python clingo module when available.
+
+        This avoids depending on external clingo wrappers that may be broken in
+        some environments.
+        """
+        if not clyngor.have_clingo_module():
+            clyngor.load_clingo_module()
+        use_module = clyngor.have_clingo_module()
+        kwargs = {
+            "options": options,
+            "use_clingo_module": use_module,
+        }
+        if nb_model is not None:
+            kwargs["nb_model"] = nb_model
+
+        # The clyngor module backend does not accept time_limit.
+        if not use_module and self.time_limit:
+            kwargs["time_limit"] = self.time_limit
+
+        if self.ground:
+            return clyngor.solve_from_grounded(self.grounded, **kwargs).discard_quotes.by_predicate
+        return clyngor.solve(files=asp_files, **kwargs).discard_quotes.by_predicate
+
+
+    @staticmethod
+    def _normalize_seed(seed) -> str:
+        """Return a plain metabolite identifier without surrounding quotes."""
+        value = str(seed)
+        if len(value) >= 2 and value[0] == '"' and value[-1] == '"':
+            value = value[1:-1]
+        return value
+
+
     def solve(self, search_mode:str, timer:dict, asp_files:list=None, step:str="classic", is_one_model:bool=False):
         """Solve the seed searching using the launch mode
 
@@ -300,26 +334,43 @@ class Reasoning(HybridReasoning):
             # CLASSIC MODE (NO FILTER, NO GUESS-CHECK)   
             case "minimize-one-model", "classic":
                 time_solve = time()
-                if self.ground:
-                    models = clyngor.solve_from_grounded(self.grounded, options=str_option, 
-                                    time_limit=self.time_limit).discard_quotes.by_predicate
-                else:
-                    models = clyngor.solve(files=asp_files, options=str_option, 
-                                    time_limit=self.time_limit).discard_quotes.by_predicate
+                models = self._run_clyngor(str_option, asp_files)
                 time_solve = time() - time_solve
                 self.get_message("command")
                 print_log(self.logger, f'{models.command}', 'debug')
-                for model, opt, optimum_found in models.by_arity.with_optimality:
-                    if optimum_found:
-                        self.optimum_found = True
-                        one_model = model
-                        if one_model.get('seed'):
-                            self.optimum = opt
-                        else:
-                            if self.network.possible_seeds:
+                last_model = None
+                last_opt = None
+                try:
+                    for model, opt, optimum_found in models.by_arity.with_optimality:
+                        last_model = model
+                        last_opt = opt
+                        if optimum_found:
+                            self.optimum_found = True
+                            one_model = model
+                            if one_model.get('seed'):
                                 self.optimum = opt
                             else:
-                                self.optimum = 0
+                                if self.network.possible_seeds:
+                                    self.optimum = opt
+                                else:
+                                    self.optimum = 0
+                except (RuntimeError, StopIteration) as e:
+                    # clyngor can fail to parse empty or truncated clingo output and
+                    # raise instead of yielding no model. Fall back to whatever model
+                    # was already parsed (handled below) instead of crashing.
+                    print_log(self.logger, f'clyngor failed to parse solver output: {e}', "error")
+                if not self.optimum_found and last_model is not None:
+                    # Some clingo backends do not expose an explicit OPTIMUM FOUND
+                    # marker through clyngor. In that case use the last model.
+                    self.optimum_found = True
+                    one_model = last_model
+                    if one_model.get('seed'):
+                        self.optimum = last_opt if last_opt is not None else (len(one_model.get('seed', ())),)
+                    else:
+                        if self.network.possible_seeds:
+                            self.optimum = last_opt if last_opt is not None else (0,)
+                        else:
+                            self.optimum = 0
                 if not self.optimum_found:
                     print_log(self.logger, 'Optimum not found', "error") 
                 else:
@@ -335,22 +386,24 @@ class Reasoning(HybridReasoning):
 
             case _, "classic":
                 time_solve = time()
-                if self.ground:
-                    models = clyngor.solve_from_grounded(self.grounded, options=str_option, 
-                                    time_limit=self.time_limit).discard_quotes.by_predicate
-                else:
-                    models = clyngor.solve(files=asp_files, options=str_option, 
-                                    time_limit=self.time_limit).discard_quotes.by_predicate
+                models = self._run_clyngor(str_option, asp_files)
                 time_solve = time() - time_solve
                 self.get_message("command")
                 print_log(self.logger, f'{models.command}', 'debug')
                 has_solution=False
-                for model in models:
-                    has_solution=True
-                    _models = [model]
+                parse_failed=False
+                try:
+                    for model in models:
+                        has_solution=True
+                        _models = [model]
+                except (RuntimeError, StopIteration) as e:
+                    # clyngor can fail to parse empty or truncated clingo output and
+                    # raise instead of yielding no model.
+                    parse_failed=True
+                    print_log(self.logger, f'clyngor failed to parse solver output: {e}', "error")
                 if has_solution:
                     models = _models
-                    seeds = [args[0] for args in models[0].get('seed', ())]
+                    seeds = [self._normalize_seed(args[0]) for args in models[0].get('seed', ())]
                     seeds=list(sorted(seeds))
                     size = len(seeds)
                     
@@ -359,8 +412,8 @@ class Reasoning(HybridReasoning):
 
                     solution_list, _ = self.complete_solutions(solution_list, 'model_'+ model_type, len(seeds), seeds)
                     self.network.add_result_seeds('REASONING', search_mode, model_type, len(seeds), seeds)
-                else:
-                    print_log(self.logger, 'Unsatisfiable problem', "error") 
+                elif not parse_failed:
+                    print_log(self.logger, 'Unsatisfiable problem', "error")
 
             # FILTER OR GUESS-CHECK mode
             #TODO redo intersection and union mode
@@ -397,21 +450,24 @@ class Reasoning(HybridReasoning):
         transf_short=""
         trans_solution_list=None
 
-        if self.ground:
-            models = clyngor.solve_from_grounded(self.grounded, options=construct_option, 
-                                time_limit=self.time_limit, nb_model=self.number_solution).discard_quotes.by_predicate
-        else:
-            models = clyngor.solve(files=asp_files, options=construct_option, 
-                                time_limit=self.time_limit, nb_model=self.number_solution).discard_quotes.by_predicate
+        models = self._run_clyngor(construct_option, asp_files, nb_model=self.number_solution)
         self.get_message("command")
         print_log(self.logger, f'{models.command}', 'debug')
         idx = 1
         m = models
-        models_list = list(m).copy()
+        parse_failed = False
+        try:
+            models_list = list(m).copy()
+        except (RuntimeError, StopIteration) as e:
+            # clyngor can fail to parse empty or truncated clingo output and
+            # raise instead of yielding no model.
+            parse_failed = True
+            print_log(self.logger, f'clyngor failed to parse solver output: {e}', "error")
+            models_list = []
         size_answers = len(models_list)
         if size_answers != 0:
             for model in models_list:
-                seeds = [args[0] for args in model.get('seed', ())]
+                seeds = [self._normalize_seed(args[0]) for args in model.get('seed', ())]
                 seeds_full=list(model.get('seed', ()))
                 seeds=list(sorted(seeds))
                 size = len(seeds)
@@ -430,7 +486,7 @@ class Reasoning(HybridReasoning):
                            trans_solution_list)
                 self.network.add_result_seeds('REASONING', search_mode, 'model_'+str(idx), size, seeds, transferred_list=trans_solution_list)
                 idx += 1
-        else:
+        elif not parse_failed:
             print_log(self.logger, 'Unsatisfiable problem', "error")
         return solution_list
 
@@ -459,4 +515,3 @@ class Reasoning(HybridReasoning):
         construct_option = ' '.join(full_option)
         return construct_option, full_option
     
-

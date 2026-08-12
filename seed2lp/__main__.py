@@ -7,12 +7,12 @@ import argparse, logging
 
 from time import time
 from sys import exit
-from os import path
+from os import path, listdir
 from shutil import copyfile
 from .file import is_valid_dir
 
 from . import utils, argument, file
-from .sbml import read_SBML_species
+from .sbml import read_SBML_species, check_fbc_support
 from .network import Network, Netcom, NET_TITLE
 from .reasoning import Reasoning
 from .reasoningcom import ComReasoning
@@ -420,8 +420,8 @@ def initiate_results(logger:logging, network:Network, options:dict, args:dict, r
     
     results["USER DATA"] = user_data
     
-    if not args['targets_as_seeds']:  
-        network.forbidden_seeds += [*network.targets]
+    if not args['targets_as_seeds']:
+        network.forbidden_seeds += [t for t in network.targets if t not in network.meta_authorized_seed_list]
 
     return results
     
@@ -867,6 +867,23 @@ def main():
     # is_valid_dir(LOG_DIR)
     log_dir=path.join(args.output_dir,"logs")
     is_valid_dir(log_dir)
+
+    try:
+        if args.cmd in ("community", "fluxcom"):
+            for filename in listdir(cfg['sbmldir']):
+                check_fbc_support(path.join(cfg['sbmldir'], filename))
+        elif args.cmd != "conf":
+            check_fbc_support(cfg['infile'])
+    except ValueError as e:
+        sbml_file = cfg['infile'] if 'infile' in cfg else cfg['comfile']
+        logger, _ = get_logger(
+            log_dir=log_dir,
+            sbml_file=sbml_file,
+            short_option=args.cmd,
+            verbose=cfg['verbose']
+        )
+        logger.error(str(e))
+        exit(1)
 
     match args.cmd:
         case "target" | "full" | "fba":
