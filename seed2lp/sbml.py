@@ -33,8 +33,12 @@ def get_root(file:str):
     f.close()
     
     # Remove the default namespace definition (xmlns="http://some/namespace")
-    default_namespace = search(r'\sxmlns="[^"]+"', xmlstring).group()
-    xmlstring = sub(default_namespace, '', xmlstring, count=1)
+    # so tags can be manipulated without namespace prefixes.
+    default_namespace = None
+    default_namespace_match = search(r'\sxmlns="([^"]+)"', xmlstring)
+    if default_namespace_match:
+        default_namespace = default_namespace_match.group(1)
+        xmlstring = sub(default_namespace_match.group(0), '', xmlstring, count=1)
 
     sbml = ET.fromstring(xmlstring)  
     #tree = ET.parse(file)
