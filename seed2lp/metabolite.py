@@ -38,7 +38,7 @@ class Metabolite:
                 
                 facts += f'{metabolite_type}("{self.id_meta}","{"{:.10f}".format(self.stoichiometry)}","{reaction_name}","{self.type}","{self.name}","{self.species}").\n'
             case "seed":
-                facts += f'{metabolite_type}("{self.id_meta}","{self.type}","{self.name}").\n'
+                facts += f'{metabolite_type}("{self.id_meta}","{self.type}","{self.name}","{self.species}").\n'
             case _:
                 facts += f'{metabolite_type}("{self.id_meta}","{"{:.10f}".format(self.stoichiometry)}","{reaction_name}","{self.type}","{self.name}","{self.species}").\n'
         return facts

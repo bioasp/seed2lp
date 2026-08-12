@@ -420,8 +420,8 @@ def initiate_results(logger:logging, network:Network, options:dict, args:dict, r
     
     results["USER DATA"] = user_data
     
-    if not args['targets_as_seeds']:  
-        network.forbidden_seeds += [*network.targets]
+    if not args['targets_as_seeds']:
+        network.forbidden_seeds += [t for t in network.targets if t not in network.meta_authorized_seed_list]
 
     return results
     

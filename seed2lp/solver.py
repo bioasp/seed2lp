@@ -138,7 +138,7 @@ class Solver:
     def set_time_limit(self):
         """Convert time limit minute into seconds for resolutions
         """
-        if self.time_limit_minute != 0:
+        if self.time_limit_minute:
             self.time_limit=self.time_limit_minute*60
         else:
             self.time_limit=None
@@ -219,7 +219,12 @@ class Solver:
                 output_type = 'SUBSET MINIMAL INTERSECTION'
                 
             
-        full_option=[self.clingo_configuration, self.clingo_strategy]
+        # seed_user/reac_import/reac_export/import_exch/... are declared in definition_atoms.lp
+        # and seed-solving.lp but only ever get a defining rule head when the matching .lp file
+        # (flux.lp) or user option (-sf) is part of this particular run, which is not the case
+        # for classic reasoning. Silencing this expected atom-undefined warning avoids alarming
+        # users with noise that never indicates an actual problem.
+        full_option=[self.clingo_configuration, self.clingo_strategy, '--warn=no-atom-undefined']
         greedy_clingo_option=self.asp.CLINGO_CONFIGURATION[search_mode]
         if greedy_clingo_option:
             full_option = [*full_option, *greedy_clingo_option]
