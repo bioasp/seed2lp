@@ -161,6 +161,31 @@ def get_fbc(sbml:ET.Element):
     return fbc
 
 
+def check_fbc_support(sbml_file:str) -> None:
+    """Check that a SBML file defines reaction flux bounds using the SBML
+    Level 3 Flux Balance Constraints (FBC) package.
+
+    Args:
+        sbml_file (str): Path to the SBML file
+
+    Raises:
+        ValueError: The SBML file has no FBC namespace (older than SBML Level 3 with FBC)
+    """
+    sbml, _, _ = get_root(sbml_file)
+    if get_fbc(sbml) is None:
+        raise ValueError(
+            f"{sbml_file}\n"
+            "This SBML file does not define reaction flux bounds using the SBML\n"
+            "Level 3 Flux Balance Constraints (FBC) package. seed2lp requires\n"
+            "SBML Level 3 with FBC (version 3.x).\n\n"
+            "To upgrade your model, you can use cobrapy:\n"
+            "    import cobra\n"
+            "    model = cobra.io.read_sbml_model(\"your_model.xml\")\n"
+            "    cobra.io.write_sbml_model(model, \"your_model_upgraded.xml\")\n\n"
+            "Then re-run seed2lp on the upgraded file.\n"
+        )
+
+
 def get_listOfParameters(model:ET.Element)-> dict:
     """return list of reactions of a SBML model"""
     listOfParameters = dict()
