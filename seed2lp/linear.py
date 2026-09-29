@@ -240,17 +240,15 @@ class Hybrid(Solver):
                     one_model_list=output_full_list[list(output_full_list.keys())[-1]]
                     self.optimum=opt
                     self.get_separate_optimum()
-                    #TODO Corrects the producible targets count
-                    #if self.network.is_subseed:
-                    #    print_log(self.logger, (f"Number of producible targets: {- self.opt_prod_tgt}"), 'info')
-                    #TODO END
+                    if self.network.is_subseed:
+                        print_log(self.logger, (f"Number of producible targets: {- self.opt_prod_tgt}"), 'info', verbose=self.verbose)
                     print_log(self.logger, f"Minimal size of seed set is {self.opt_size}\n", 'info', verbose=self.verbose)
                     if self.optimum is not None and self.network.keep_import_reactions:
                         print_log(self.logger, "Try with the option remove import reactions.", "info", verbose=self.verbose)
                     solution_list[model_type] = one_model_list
                     #Get obejctives fluxes and add results seeds to network object
-                    obj_flux_dict = self.get_objectives_flux(one_model_list[5])
-                    self.add_result_seeds(search_mode, model_type, one_model_list[1], one_model_list[3], obj_flux_dict)
+                    obj_flux_dict = self.get_objectives_flux(one_model_list["reaction_flux"])
+                    self.add_result_seeds(search_mode, model_type, one_model_list["size"], one_model_list["Set of seeds"], obj_flux_dict)
                 # Satisfiable probleme but optimum not found in given time
                 else:
                     print_log(self.logger, 'Optimum not found', "error", verbose=self.verbose) 
@@ -271,8 +269,8 @@ class Hybrid(Solver):
                 else:
                     for  model_name, solution in solution_list.items():
                         #Get obejctives fluxes and add results seeds to network object
-                        obj_flux_dict = self.get_objectives_flux(solution[5])
-                        self.add_result_seeds(search_mode, model_name, solution[1], solution[3], obj_flux_dict)
+                        obj_flux_dict = self.get_objectives_flux(solution["reaction_flux"])
+                        self.add_result_seeds(search_mode, model_name, solution["size"], solution["Set of seeds"], obj_flux_dict)
 
             case "submin-enumeration":
                 cmd = clingo_lpx.command(files=asp_files, options=full_option, nb_model= self.number_solution,
@@ -290,8 +288,8 @@ class Hybrid(Solver):
                 else:
                     for  model_name, solution in solution_list.items():
                         #Get obejctives fluxes and add results seeds to network object
-                        obj_flux_dict = self.get_objectives_flux(solution[5])
-                        self.add_result_seeds(search_mode, model_name, solution[1], solution[3], obj_flux_dict)
+                        obj_flux_dict = self.get_objectives_flux(solution["reaction_flux"])
+                        self.add_result_seeds(search_mode, model_name, solution["size"], solution["Set of seeds"], obj_flux_dict)
 
             case "minimize-intersection":
                 cmd = clingo_lpx.command(files=asp_files, options=full_option,
@@ -310,8 +308,8 @@ class Hybrid(Solver):
                     model = output_full_list[list(output_full_list.keys())[-1]]
                     solution_list[model_type ] = model
                     #Get obejctives fluxes and add results seeds to network object
-                    obj_flux_dict = self.get_objectives_flux(model[5])
-                    self.add_result_seeds(search_mode, model_type, model[1], model[3], obj_flux_dict)
+                    obj_flux_dict = self.get_objectives_flux(model["reaction_flux"])
+                    self.add_result_seeds(search_mode, model_type, model["size"], model["Set of seeds"], obj_flux_dict)
 
 
             case "submin-intersection": 
@@ -332,8 +330,8 @@ class Hybrid(Solver):
                     model = output_full_list[list(output_full_list.keys())[-1]]
                     solution_list[model_type] = model
                     #Get obejctives fluxes and add results seeds to network object
-                    obj_flux_dict = self.get_objectives_flux(model[5])
-                    self.add_result_seeds(search_mode, model_type, model[1], model[3], obj_flux_dict)
+                    obj_flux_dict = self.get_objectives_flux(model["reaction_flux"])
+                    self.add_result_seeds(search_mode, model_type, model["size"], model["Set of seeds"], obj_flux_dict)
         if 'Total' in full_timers:
             timer["Grounding time"] = round(full_timers['Total'] - full_timers['Solve'], 3)
             timer["Solving time"] = round(full_timers['Solve'], 3)   

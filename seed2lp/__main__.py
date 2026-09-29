@@ -6,12 +6,12 @@
 import argparse, logging
 
 from time import time
-from sys import exit
+from sys import exit, stderr
 from os import path, listdir
 from shutil import copyfile
 from .file import is_valid_dir
 
-from . import utils, argument, file
+from . import utils, argument, file, color, print_logo
 from .sbml import read_SBML_species, check_fbc_support
 from .network import Network, Netcom, NET_TITLE
 from .reasoning import Reasoning
@@ -380,7 +380,15 @@ def initiate_results(logger:logging, network:Network, options:dict, args:dict, r
     net = dict()
 
     if network.targets:
-        user_data['TARGETS'] = network.targets
+        # Single network: every target maps to a single-element list containing
+        # only itself (see network.py's is_community=False branch of
+        # prefix_id_network()), so the dict is flattened to a plain list for
+        # readability. Community mode keeps the dict, since one target can
+        # legitimately group several species-prefixed metabolite ids there.
+        if network.is_community:
+            user_data['TARGETS'] = network.targets
+        else:
+            user_data['TARGETS'] = list(network.targets.keys())
     if network.seeds:
         user_data['SEEDS'] = network.seeds
     if network.forbidden_seeds:
@@ -730,6 +738,14 @@ def network_flux(args:argparse, log_dir:str):
     input_dict["Objective"] = data["NETWORK"]["OBJECTIVE"][0][1]
 
     network = Network(args['infile'], to_print=False, input_dict=input_dict, verbose=args['verbose'])
+    # Restore the exact targets used for the original seed search (custom -tf
+    # file or auto-detected) instead of leaving them to be silently
+    # re-derived: init_with_inputs() (the normal path for this) is gated on
+    # run_mode, which reload intentionally never sets, and re-deriving would
+    # also re-run the objective-reactant-as-target logic, which could add
+    # targets beyond what the original run actually used.
+    if data.get("USER DATA", {}).get("TARGETS"):
+        network.targets = utils.targets_from_json(data["USER DATA"]["TARGETS"])
     maximize, solve = network.convert_data_to_resmod(data)
     network.check_fluxes(maximize,  args["flux_parallel"])
 
@@ -769,9 +785,13 @@ def network_flux_community(args:argparse, log_dir:str):
         run_solve = data["NETWORK"]["SOLVE"]
 
     temp = get_temp_dir(args)
-    
-    network=Netcom(args["comfile"], args["sbmldir"], temp, run_solve=run_solve, input_dict=input_dict, to_print=False, 
+
+    network=Netcom(args["comfile"], args["sbmldir"], temp, run_solve=run_solve, input_dict=input_dict, to_print=False,
                    write_sbml=True, equality_flux=args["equality_flux"], verbose=args['verbose'])
+    # See network_flux() for why this is a direct post-construction assignment
+    # rather than going through input_dict/init_with_inputs().
+    if data.get("USER DATA", {}).get("TARGETS"):
+        network.targets = utils.targets_from_json(data["USER DATA"]["TARGETS"])
 
     maximize, solve = network.convert_data_to_resmod(data)
 
@@ -802,8 +822,12 @@ def scope(args:argparse, log_dir:str):
     )
 
     input_dict=dict()
-    network = Network(args['infile'], to_print=False, input_dict=input_dict, verbose=args['verbose'])
     data = load_json(args['result_file'])
+    network = Network(args['infile'], to_print=False, input_dict=input_dict, verbose=args['verbose'])
+    # See network_flux() for why this is a direct post-construction assignment
+    # rather than going through input_dict/init_with_inputs().
+    if data.get("USER DATA", {}).get("TARGETS"):
+        network.targets = utils.targets_from_json(data["USER DATA"]["TARGETS"])
     network.convert_data_to_resmod(data)
     scope = Scope(args['infile'], network, args['output_dir'])
     scope.execute()
@@ -860,7 +884,14 @@ def get_objective_targets(args:argparse, log_dir:str):
 
 def main():
     global LOG_DIR
-    args = argument.parse_args()
+    print_logo()
+    try:
+        args = argument.parse_args()
+    except FileNotFoundError as e:
+        # No log file can be opened yet: the failing argument is what would
+        # tell us where to write it (infile, sbmldir, output_dir, ...)
+        print(f"{color.red_bright}{e}{color.reset}", file=stderr)
+        exit(1)
     cfg = argument.get_config(args, PROJECT_DIR)
 
     # LOG_DIR =path.join(args.output_dir,"logs")

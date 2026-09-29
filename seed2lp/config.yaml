@@ -6,8 +6,8 @@ seed2lp:
     # Options
     verbose                     : False
     # Searching mode
-    mode                        : "all"  # 'minimize', 'subsetmin', 'all' / for single network
-    solve                       : "all"  # 'reasoning', 'filter', 'guess_check', 'guess_check_div', 'hybrid', 'all'
+    mode                        : "subsetmin"  # 'minimize', 'subsetmin', 'all' / for single network
+    solve                       : "reasoning"  # 'reasoning', 'filter', 'guess_check', 'guess_check_div', 'hybrid', 'all'
     intersection                : False
     union                       : False
     targets_as_seeds            : False
@@ -29,8 +29,8 @@ seed2lp_com:
     # Options
     verbose                     : False
     # Searching mode
-    community_mode              : "bisteps"  # 'bisteps', 'global', 'delsupset' 
-    solve                       : "all"  # 'reasoning', 'filter', 'guess_check', 'guess_check_div', 'all'
+    community_mode              : "bisteps"  # 'bisteps', 'global', 'delsupset'
+    solve                       : "reasoning"  # 'reasoning', 'filter', 'guess_check', 'guess_check_div', 'all'
     intersection                : False
     union                       : False
     targets_as_seeds            : False

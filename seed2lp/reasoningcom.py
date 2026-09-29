@@ -4,9 +4,11 @@ from .reasoning import Reasoning
 from .file import delete, save, load_tsv, existing_file
 from . import color, logger
 from multiprocessing import Process, Queue
+from queue import Empty
 from os import path
 from json import loads
 from .logger import init_logger, print_log
+from .utils import build_solution_dict
 
 USE_MULTIPROCESSING=True
 
@@ -209,10 +211,11 @@ class ComReasoning(Reasoning):
                                 number_rejected +=1
                                 keep_solution=False
                                 current_timer = time() - start_time
-                                # write all 100 rejected 
-                                # or write from 5 minute before finishing the process near to finish  the process
+                                # write all 100 rejected
+                                # or write once 90% of the time limit has elapsed, so the threshold
+                                # stays meaningful (not negative/always-true) for short time limits too
                                 if USE_MULTIPROCESSING and number_rejected%100 == 0 \
-                                or (current_timer!=0 and current_timer > self.time_limit_minute*60 - 300):
+                                or (current_timer!=0 and current_timer > self.time_limit_minute*60*0.9):
                                     self.temp_rejected(number_rejected, full_path)
                             #print(current_timer)
                             current_timer = time() - start_time
@@ -411,10 +414,11 @@ class ComReasoning(Reasoning):
                             number_rejected +=1
                             keep_solution=False
                             current_timer = time() - start_time
-                            # write all 100 rejected 
-                            # or write from 5 minute before finishing the process near to finish  the process
+                            # write all 100 rejected
+                            # or write once 90% of the time limit has elapsed, so the threshold
+                            # stays meaningful (not negative/always-true) for short time limits too
                             if USE_MULTIPROCESSING and number_rejected%100 == 0 \
-                            or (current_timer!=0 and current_timer > self.time_limit_minute*60 - 300):
+                            or (current_timer!=0 and current_timer > self.time_limit_minute*60*0.9):
                                 self.temp_rejected(number_rejected, full_path)
                             keep_solution=False
 
@@ -481,7 +485,7 @@ class ComReasoning(Reasoning):
                     ctrl, avoided= self.guess_check_constraints(ctrl, atoms, seeds, avoided)
 
         if not self.partial_delete_supset:
-            solution_list = self.add_print_solution(solution_list, dict_by_size_seeds, mode, cobra_flux)
+            solution_list = self.add_print_solution(solution_list, dict_by_size_seeds, mode)
 
         if step != "classic":
             print_log(self.logger, f'Rejected solution during process: {number_rejected} \n', "info", verbose=self.verbose)
@@ -495,7 +499,7 @@ class ComReasoning(Reasoning):
 
 
 
-    def add_print_solution(self,solution_list:dict, dict_by_size_seeds:dict, mode:str, flux_cobra:float=None):
+    def add_print_solution(self,solution_list:dict, dict_by_size_seeds:dict, mode:str):
         """Used for delete superset mode. The solution are printed after manually checking solution to identify if they are
         subset minimal of previous found solution and finding the defined number of solutions wanted. The model name (solution)
         are therefore reviewed. The solution are both printed and added as answer to the Network object.
@@ -504,7 +508,6 @@ class ComReasoning(Reasoning):
             solution_list (dict): List of solutions into a dictionnary (key value is the name of the model)
             dict_by_size_seeds (dict): A dictionnary of all set of seeds found, having as key the size of the set to limit the loops
             mode (str): The string solving mode (Classic, filter, guess_check, guess_check diversty)
-            flux_cobra (float, optional): The obra flux. Defaults to None.
 
         Returns:
             dict: new_solution_list
@@ -515,10 +518,11 @@ class ComReasoning(Reasoning):
         for name, solution in solution_list.items():
             new_name = 'model_'+str(solution_idx)
             new_solution_list[new_name]=solution
-            size = int(solution[1])
-            seeds = solution[3]
-            trans_solution_list = solution[5]
-            
+            size = solution["size"]
+            seeds = solution["Set of seeds"]
+            trans_solution_list = solution["Set of transferred"]
+            flux_cobra = solution.get("Cobra flux")
+
             transf_short = dict_by_size_seeds[size][name]["transf_short"]
             seeds_full = dict_by_size_seeds[size][name]["seeds_full"]
             trans_complete = dict_by_size_seeds[size][name]["trans_complete"]
@@ -556,10 +560,17 @@ class ComReasoning(Reasoning):
             column_len = 7
             try:
                 temp_list = load_tsv(full_path)
-                for solution in temp_list:
-                    if len(solution) == column_len:
-                        # some line has no data value only the number of rejected solution
-                        if solution[0]:
+            except Exception as e:
+                temp_list = []
+                print_log(self.logger, f"An error occured while reading temporary file\n {full_path}:\n {e}", 'error', verbose=self.verbose)
+
+            for solution in temp_list:
+                if len(solution) == column_len:
+                    # some line has no data value only the number of rejected solution
+                    if solution[0]:
+                        # Each line is parsed independently: a single malformed/corrupted
+                        # line must not discard the solutions already found on other lines.
+                        try:
                             name = solution[0]
                             size = int(solution[1])
                             seeds = solution[2].replace(" ", "")
@@ -574,14 +585,14 @@ class ComReasoning(Reasoning):
                             seeds_full = eval(seeds_full)
                             sol["seeds_full"] = seeds_full
 
-                            sol_details = ["size", solution[1]] + \
-                                ["Set of seeds",seeds_list]
+                            transferred_list = eval(solution[5])
 
-                            transferred_list = eval(solution[5]) 
-                            sol_details += ["Set of transferred", transferred_list]
-
-                            flux_cobra = loads(solution[4].replace("'",'"'))
-                            sol += ["Cobra flux",  flux_cobra]
+                            # solution[4] is empty for "classic"/"reasoning" step, which has no
+                            # cobra flux to record (complete_solutions() still allocates the
+                            # column for every community row, flux or not)
+                            flux_cobra = loads(solution[4]) if solution[4] else None
+                            sol_details = build_solution_dict(size, seeds_list, cobra_flux=flux_cobra,
+                                                                transferred=transferred_list)
 
                             transf_short, trans_complete, _ =self.get_transfers_info(transferred_list)
 
@@ -593,17 +604,16 @@ class ComReasoning(Reasoning):
                             solution_list, dict_by_size_seeds, max_size = self.complete_dict_solution(solution_list, dict_by_size_seeds, max_size, seeds, size, name, sol)
 
                             solution_list=self.check_set_submin(seeds, dict_by_size_seeds, max_size, solution_list)
+                        except Exception as e:
+                            print_log(self.logger, f"Skipping corrupted solution line in temporary file\n {full_path}:\n {e}", 'error', verbose=self.verbose)
                     #get the last occurence for rejected solutions number
                     number_rejected = solution[3]
 
-            except Exception as e:
-                print_log(self.logger, f"An error occured while reading temporary file\n {full_path}:\n {e}", 'error', self.verbose)
-
             if any(solution_list):
-                solution_list = self.add_print_solution(solution_list, dict_by_size_seeds, mode, flux_cobra) 
+                solution_list = self.add_print_solution(solution_list, dict_by_size_seeds, mode)
 
             if step != "classic":
-                print_log(self.logger, f'Rejected solution during process: at least {number_rejected} \n', 'info', self.verbose)
+                print_log(self.logger, f'Rejected solution during process: at least {number_rejected} \n', 'info', verbose=self.verbose)
 
         delete(full_path)
         return solution_list, number_rejected
@@ -628,44 +638,62 @@ class ComReasoning(Reasoning):
         full_path = path.join(self.temp_dir,f"{self.temp_result_file}.tsv")
         start = time()
         if self.community_mode == "bisteps":
-            p = Process(target=self.solve_bisteps(full_option, solution_list, search_mode,
+            p = Process(target=self.solve_bisteps, args=(full_option, solution_list, search_mode,
                                                         step, asp_files, queue, full_path))
         elif self.community_mode == "delsupset":
-            p = Process(target=self.solve_delete_superset(full_option, solution_list, 
+            p = Process(target=self.solve_delete_superset, args=(full_option, solution_list,
                                                         step, asp_files, queue, full_path))
+        match step:
+            case "classic":
+                mode = 'REASONING'
+            case "filter":
+                mode = 'REASONING FILTER'
+            case "guess_check":
+                mode = 'REASONING GUESS-CHECK'
+            case "guess_check_div":
+                mode =  'REASONING GUESS-CHECK DIVERSITY'
+
         p.start()
+        process_failed = False
         try:
-            # the time out limit is added here
-            obj, solution_list, time_ground, time_solve, number_rejected = queue.get(timeout=self.time_limit)
-            self.network.result_seeds = obj.network.result_seeds 
-            delete(full_path)
-        except:
-            time_process=time() - start
-            time_ground = time_solve = -1
-            unsat = False
-            time_out = False
-            if not self.time_limit or time_process < self.time_limit:
-                unsat = True
-            else:
-                time_out = True
-            if time_out:
-                print_log(self.logger, f'Time out: {self.time_limit_minute} min expired', "error", verbose=self.verbose)
+            try:
+                # the time out limit is added here (polling: see wait_for_subprocess())
+                result, timed_out = self.wait_for_subprocess(queue, p)
+                if result is not None:
+                    obj, solution_list, time_ground, time_solve, number_rejected = result
+                    self.network.result_seeds = obj.network.result_seeds
+                    delete(full_path)
+                elif timed_out:
+                    # The subprocess was still alive when the time budget ran out: a
+                    # genuine time out (a genuine unsatisfiable search still reaches
+                    # queue.put() normally, so it never lands here - see the
+                    # "if not any(solution_list)" below).
+                    time_ground = time_solve = -1
+                    print_log(self.logger, f'Time out: {self.time_limit_minute} min expired', "error", verbose=self.verbose)
+                    solution_list, number_rejected = self.get_solution_from_temp_com(False, full_path, step, mode)
+                else:
+                    # The subprocess died (crash, I/O error, malformed input...) before
+                    # ever reaching queue.put(): a failure, not an unsatisfiable problem.
+                    process_failed = True
+                    time_ground = time_solve = -1
+                    p.join(timeout=1)
+                    print_log(self.logger, f'Solver process failed unexpectedly (exited with code {p.exitcode}) - check the traceback above for the underlying cause', "error", verbose=self.verbose)
+                    solution_list, number_rejected = self.get_solution_from_temp_com(False, full_path, step, mode)
+            except Exception as e:
+                # Anything else: an error in the parent-side bookkeeping around a
+                # successful result (malformed object, delete(full_path) failing...).
+                # Still a failure, not an unsatisfiable problem.
+                process_failed = True
+                time_ground = time_solve = -1
+                print_log(self.logger, f'Solver process failed unexpectedly: {type(e).__name__}: {e}', "error", verbose=self.verbose)
+                if p.exitcode not in (None, 0):
+                    print_log(self.logger, f'Solver process exited with code {p.exitcode} - see traceback above for the underlying cause', "error", verbose=self.verbose)
+                solution_list, number_rejected = self.get_solution_from_temp_com(False, full_path, step, mode)
+        finally:
+            p.terminate()
+            queue.close()
 
-            match step:
-                case "classic":
-                    mode = 'REASONING'
-                case "filter":
-                    mode = 'REASONING FILTER'
-                case "guess_check":
-                    mode = 'REASONING GUESS-CHECK'
-                case "guess_check_div":
-                    mode =  'REASONING GUESS-CHECK DIVERSITY'  
-            solution_list, number_rejected = self.get_solution_from_temp_com(unsat, full_path, step, mode)
-        
-        p.terminate()
-        queue.close()
-
-        if not any(solution_list): 
+        if not any(solution_list) and not process_failed:
             print_log(self.logger, 'Unsatisfiable problem', "error", verbose=self.verbose)
 
         if time_ground != None:

@@ -7,6 +7,7 @@ from .network import Network
 from .reasoninghybrid import HybridReasoning
 from . import color
 from .logger import print_log
+from .utils import build_solution_dict
 
 
 ###################################################################
@@ -175,18 +176,17 @@ class Reasoning(HybridReasoning):
             self.get_separate_optimum()
             print_log(self.logger, f"Optimum found.", "info") 
             if self.network.is_subseed:
-                print_log(self.logger, (f"Number of producible targets: {- self.opt_prod_tgt}"), 'info', self.verbose)
-            print_log(self.logger, f"Minimal size of seed set is {self.opt_size}\n", 'info', self.verbose)
+                print_log(self.logger, (f"Number of producible targets: {- self.opt_prod_tgt}"), 'info', verbose=self.verbose)
+            print_log(self.logger, f"Minimal size of seed set is {self.opt_size}\n", 'info', verbose=self.verbose)
             if self.opt_size > 0:
                 seeds = [self._normalize_seed(args[0]) for args in one_model.get('seed', ())]
                 seeds=list(sorted(seeds))
             else:
                 seeds = []
                 if self.network.keep_import_reactions:
-                    print_log(self.logger, "Try with the option remove import reactions.", 'info', self.verbose)
+                    print_log(self.logger, "Try with the option remove import reactions.", 'info', verbose=self.verbose)
             #print_log(self.logger, f"\nOne solution:\n{', '.join(map(str, seeds))}\n", 'info')
-            solution_list['model_one_solution'] = ["size", self.opt_size] + \
-                                    ["Set of seeds", seeds]
+            solution_list['model_one_solution'] = build_solution_dict(self.opt_size, seeds)
 
         return solution_list, seeds
     

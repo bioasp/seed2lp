@@ -2,10 +2,10 @@
 Clingo lpx functions for launching command and extract results.
 """
 
-import subprocess, logging
+import subprocess, logging, sys
 import json
 #from resource import getrusage, RUSAGE_CHILDREN
-from .utils import repair_json
+from .utils import repair_json, build_solution_dict
 from . import color #logger
 try:
     from resource import getrusage, RUSAGE_CHILDREN
@@ -33,7 +33,7 @@ def command(files:list, options:list, nb_model:int=0, time_limit:int=0) -> iter:
         iter: Composition of the command to run
     """
 
-    CMD = ['python', '-m', 'clingolpx']
+    CMD = [sys.executable, '-m', 'clingolpx']
     options = list(filter(None, options))
 
     if time_limit:
@@ -86,7 +86,10 @@ def solve(cmd:list, time_limit:int):
     if is_killed:
         error_code=0
     if error_code==1:
-        logger.error(f'Timeout: {time_limit/60} min expired')
+        if time_limit:
+            logger.error(f'Timeout: {time_limit/60} min expired')
+        else:
+            logger.error('Clingo-lpx exited with error code 1')
     return str(proc_output, 'UTF-8'), err_output, error_code, round(memory,3), is_killed
 
 
@@ -106,7 +109,6 @@ def result_convert(proc_output:str, objectives:list=None, enum_mode:str="",
         result (dict), unsatisfiable (bool), has_optimum (bool), time (dict), costs (list)
     """
     result={}
-    seed_accu={}
     time={}
     has_optimum = False
     unsatisfiable = True
@@ -139,14 +141,12 @@ def result_convert(proc_output:str, objectives:list=None, enum_mode:str="",
                             get_model_data(model, objectives)
                     nb_seed=len(seeds_list)
                     nb_seed_accu=len(seeds_accu_list)
-                    result[f'model_{model_number}']=["size", nb_seed] + \
-                                            ["Set of seeds", seeds_list.copy()] + \
-                                            ['reaction_flux', reaction_list.copy()] 
+                    accu = None
                     if nb_seed_accu or nb_seed_accu>0:
-                        seed_accu["size"] = nb_seed_accu
-                        seed_accu["Set of seeds"] = seeds_accu_list.copy()
-                        result[f'model_{model_number}']=result[f'model_{model_number}'] +\
-                                                                ["accumulation avoid with seeds", seed_accu]
+                        accu = {"size": nb_seed_accu, "Set of seeds": seeds_accu_list.copy()}
+                    result[f'model_{model_number}'] = build_solution_dict(nb_seed, seeds_list.copy(),
+                                                                           reaction_flux=reaction_list.copy(),
+                                                                           accumulation_avoided_seeds=accu)
                     if "Costs" in model:
                         costs = model["Costs"]
                     if to_print:
@@ -158,14 +158,12 @@ def result_convert(proc_output:str, objectives:list=None, enum_mode:str="",
                         nb_seed=len(seeds_list)
                         nb_seed_accu=len(seeds_accu_list)
                         print_data(model_number, objective_str, seeds_list, seeds_accu_list)
-                        result[f'model_{model_number}']=["size", nb_seed] + \
-                                                ["Set of seeds", seeds_list.copy()] + \
-                                                ['reaction_flux', reaction_list.copy()] 
+                        accu = None
                         if nb_seed_accu or nb_seed_accu>0:
-                            seed_accu["size"] = nb_seed_accu
-                            seed_accu["Set of seeds"] = seeds_accu_list.copy()
-                            result[f'model_{model_number}']=result[f'model_{model_number}'] +\
-                                                                    ["accumulation avoid with seeds", seed_accu]
+                            accu = {"size": nb_seed_accu, "Set of seeds": seeds_accu_list.copy()}
+                        result[f'model_{model_number}'] = build_solution_dict(nb_seed, seeds_list.copy(),
+                                                                               reaction_flux=reaction_list.copy(),
+                                                                               accumulation_avoided_seeds=accu)
                         model_number+=1
 
     return result, unsatisfiable, has_optimum, time, costs

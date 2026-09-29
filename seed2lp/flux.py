@@ -4,6 +4,7 @@ from cobra.core import Model
 import warnings
 from . import color #,logger
 from .logger import print_log
+from .utils import decode_sbml_id, metabolite_root_id
 
 def get_model(model_file:str):
     """Get cobra model
@@ -56,7 +57,7 @@ def set_objective(model:Model, objective:str):
         
 
 def remove_prefix_reaction(reaction):
-    return sub("^R_","",reaction)
+    return decode_sbml_id(sub("^R_","",reaction))
 
 
 def get_reaction(model:Model, objective_name:str):
@@ -122,15 +123,15 @@ def get_flux(model:Model, objective_reaction:str, list_objective:list,
             # Create Transfer reaction  between 2 species where reactant is metabolite "From"
             # and product is metabolite "To"
             for transf_meta in transferred_list:
-                name_meta=transf_meta["Metabolite"].rsplit('_',1)[0]
+                name_meta=metabolite_root_id(transf_meta["Metabolite"])
                 name_meta=sub("^M_","",name_meta)
                 id_reaction = f'R_TRANSF_{name_meta}_{transf_meta["From"]}_{transf_meta["To"]}'
                 # Create the transfer reaction
                 reaction = cobra.Reaction(id_reaction)
                 reaction.lower_bound = 0.
                 reaction.upper_bound = 1000.
-                reactant = model.metabolites.get_by_id(sub("^M_","",transf_meta["ID from"]))
-                procuct = model.metabolites.get_by_id(sub("^M_","",transf_meta["ID to"]))
+                reactant = model.metabolites.get_by_id(decode_sbml_id(sub("^M_","",transf_meta["ID from"])))
+                procuct = model.metabolites.get_by_id(decode_sbml_id(sub("^M_","",transf_meta["ID to"])))
                 reaction.add_metabolites({
                         reactant: -1.0,
                         procuct: 1.0
@@ -276,7 +277,7 @@ def calculate(model:Model, list_objective:list, list_seeds:list,
     objective_reaction = set_objective(model, list_objective[0])
 
     for seed in list_seeds:
-        seed = sub("^M_","",seed)
+        seed = decode_sbml_id(sub("^M_","",seed))
         #compartment = model.metabolites.get_by_id(seed).compartment
         #if compartment == 'e':
         if seed in meta_exchange_list.keys():

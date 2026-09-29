@@ -2,6 +2,7 @@ import logging
 from os import path, makedirs, stat, remove
 from json import dump, load
 from csv import writer, reader
+from . import color
 #from . import logger
 
 
@@ -93,9 +94,13 @@ def save(filename:str, directory:str, results, type:str, is_result_temp=False):
                     out_file_path += '.txt'
                 with open(out_file_path, "w") as f:
                     f.write("\n".join(results))
+        if not is_result_temp:
+            print(f"{color.green_light}Output file written: {out_file_path}{color.reset}")
     except  Exception as e:
         logger.error(f"while saving file: {e}")
-    
+
+    return out_file_path
+
 
 
 def file_is_empty(file_path:str):
