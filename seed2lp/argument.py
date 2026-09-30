@@ -148,8 +148,8 @@ def cli_parser() -> argparse.ArgumentParser:
     pp_mode = argparse.ArgumentParser(add_help=False, formatter_class=argparse.RawTextHelpFormatter)
     pp_mode.add_argument(
         '-m', '--mode', dest="mode", 
-        type=str, default='subsetmin',  choices=['minimize', 'subsetmin', 'all'], 
-        help="""Choose a mode for comuting solutions: \n \
+        type=str, default='subsetmin',  choices=['minimize', 'subsetmin', 'all'],
+        help="""Choose a mode for comuting solutions (default: subsetmin): \n \
                - minimize : The smallest set of seed \n \
                - subsetmin : All the minimal solution included into solutions (subset minimal)\n \
                - all: Compute subsetmin then minimize""",
@@ -157,41 +157,41 @@ def cli_parser() -> argparse.ArgumentParser:
     )
     pp_solve = argparse.ArgumentParser(add_help=False, formatter_class=argparse.RawTextHelpFormatter)
     pp_solve.add_argument(
-        '-so', '--solve', dest="solve", 
-        type=str, default='reasoning',  choices=['reasoning', 'filter', 'guess_check', 'guess_check_div', 'hybrid', 'all'], 
-        help="Select the solving mode\n \
+        '-so', '--solve', dest="solve",
+        type=str, default='reasoning',  choices=['reasoning', 'filter', 'guess_check', 'guess_check_div', 'hybrid', 'all'],
+        help="Select the solving mode (default: reasoning)\n \
                - reasoning : Only reasoning, no linear calcul \n \
                - hybrid : Reasoning and linar calcul\n \
                - guess_check : Only reasoning with guess and check results using cobra (adapts rules) \n \
                - guess_check_div : Only reasoning with guess and check results using cobra (adapts rules) and add diversity \n \
                - filter : Only reasoning with a cobra filter validation during search (do not adapt rules)  \n \
-               - all : Compute reasoning then hybrid",
+               - all : Compute reasoning then hybrid then fba",
         required=False
-    )  
+    )
     pp_solve_com = argparse.ArgumentParser(add_help=False, formatter_class=argparse.RawTextHelpFormatter)
     pp_solve_com.add_argument(
-        '-so', '--solve', dest="solve", 
-        type=str, default='reasoning',  choices=['reasoning', 'filter', 'guess_check', 'guess_check_div'], 
-        help="Select the solving mode\n \
+        '-so', '--solve', dest="solve",
+        type=str, default='reasoning',  choices=['reasoning', 'filter', 'guess_check', 'guess_check_div'],
+        help="Select the solving mode (default: reasoning)\n \
                - reasoning : Only reasoning, no linear calcul \n \
                - guess_check : Only reasoning with guess and check results using cobra (adapts rules) \n \
                - guess_check_div : Only reasoning with guess and check results using cobra (adapts rules) and add diversity \n \
                - filter : Only reasoning with a cobra filter validation during search (do not adapt rules)  \n \
-               - all : Compute reasoning",
+               - all : Compute reasoning then hybrid then fba",
         required=False
     )
     pp_intersection = argparse.ArgumentParser(add_help=False)
     pp_intersection.add_argument(
-        '-i', '--intersection', dest="intersection", 
+        '-i', '--intersection', dest="intersection",
         action='store_true',
-        help="Compute intersection of solutions",
+        help="Compute intersection of solutions (default: disabled, all solutions kept)",
         required=False
     )
     pp_union = argparse.ArgumentParser(add_help=False)
     pp_union.add_argument(
-        '-u', '--union', dest="union", 
+        '-u', '--union', dest="union",
         action='store_true',
-        help="Compute union of solutions",
+        help="Compute union of solutions (default: disabled, all solutions kept)",
         required=False
     )
 
@@ -249,30 +249,34 @@ def cli_parser() -> argparse.ArgumentParser:
     #-------------------------------------------------------
     pp_targets_as_seeds = argparse.ArgumentParser(add_help=False)
     pp_targets_as_seeds.add_argument(
-        '-tas', '--targets-as-seeds', dest="targets_as_seeds", 
+        '-tas', '--targets-as-seeds', dest="targets_as_seeds",
         action='store_true',
-        help="Targets are allowed as seeds",
+        help="Targets are allowed as seeds (default: not allowed)",
         required=False
     )
     pp_topological_injection = argparse.ArgumentParser(add_help=False)
     pp_topological_injection.add_argument(
-        '-ti', '--topological-injection', dest="topological_injection", 
+        '-ti', '--topological-injection', dest="topological_injection",
         action='store_true',
-        help="Use topological injection found in sbml data",
+        help="Use topological injection found in sbml data: exchange metabolites are "
+             "automatically forced as seeds (default: disabled, seeds are inferred freely)",
         required=False
     )
     pp_keep_import_reactions = argparse.ArgumentParser(add_help=False)
     pp_keep_import_reactions.add_argument(
-        '-kir', '--keep-import-reactions', dest="keep_import_reactions", 
+        '-kir', '--keep-import-reactions', dest="keep_import_reactions",
         action='store_true',
-        help="Keep import reactions found in sbml file",
+        help="Keep import reactions found in sbml file instead of deleting them during "
+             "the conversion to ASP: exchange metabolites remain free to be inferred as "
+             "seeds or not, they are not forced like with -ti/--topological-injection "
+             "(default: disabled, import reactions are deleted)",
         required=False
     )
     pp_accumulation = argparse.ArgumentParser(add_help=False)
     pp_accumulation.add_argument(
-        '-accu', '--accumulation', dest="accumulation", 
+        '-accu', '--accumulation', dest="accumulation",
         action='store_true',
-        help="Accumulation allowed",
+        help="Accumulation allowed (default: forbidden)",
         required=False
     )
 
@@ -282,25 +286,25 @@ def cli_parser() -> argparse.ArgumentParser:
     #-------------------------------------------------------
     pp_check_flux= argparse.ArgumentParser(add_help=False)
     pp_check_flux.add_argument(
-        '-cf', '--check-flux', dest="check_flux", 
+        '-cf', '--check-flux', dest="check_flux",
         action='store_true',
-        help="Run a flux check on a resulted set of seeds using cobra.py",
+        help="Run a flux check on a resulted set of seeds using cobra.py (default: disabled)",
         required=False
     )
     pp_maximize_flux = argparse.ArgumentParser(add_help=False)
     pp_maximize_flux.add_argument(
-        '-max', '--maximize-flux', dest="maximize_flux", 
+        '-max', '--maximize-flux', dest="maximize_flux",
         action='store_true',
-        help="Maximize the flux of objective reaction",
+        help="Maximize the flux of objective reaction (default: disabled)",
         required=False
     )
     pp_com_equality_flux = argparse.ArgumentParser(add_help=False)
     pp_com_equality_flux.add_argument(
-        '-ef', '--equality-flux', dest="equality_flux", 
+        '-ef', '--equality-flux', dest="equality_flux",
         action='store_true',
-        help="""Forces flux equality between species biomass in community using cobra.py 
+        help="""Forces flux equality between species biomass in community using cobra.py
             while check_flux is used or while sovling in Filter, Guess-Check or Guess-Check with Diversity modes.
-            If not used, the tool ensures a minimum flux into species biomass.""",
+            If not used (default), the tool ensures a minimum flux into species biomass.""",
         required=False
     )
     pp_check_flux_parallel = argparse.ArgumentParser(add_help=False)

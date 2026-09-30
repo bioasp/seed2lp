@@ -4,6 +4,7 @@
 import logging
 import xml.etree.ElementTree as ET
 from re import sub, match, search
+from .utils import metabolite_root_id
 #from . import logger
 
 def register_all_namespaces(file:str):
@@ -11,8 +12,18 @@ def register_all_namespaces(file:str):
 
     Args:
         file (str): SBML file path
+
+    Raises:
+        ValueError: The file is not well-formed XML and could not be parsed
     """
-    namespaces = dict([node for _, node in ET.iterparse(file, events=['start-ns'])])
+    try:
+        namespaces = dict([node for _, node in ET.iterparse(file, events=['start-ns'])])
+    except ET.ParseError as e:
+        raise ValueError(
+            f"{file}\n"
+            f"This file is not valid XML and could not be parsed: {e}\n"
+            "Check that the file is complete and well-formed."
+        ) from e
     for ns in namespaces:
         #print(ns,  namespaces[ns])
         ET.register_namespace(ns, namespaces[ns])
@@ -102,10 +113,10 @@ def get_listOfReactants(reaction:ET.Element, species:str=None, is_community:bool
                 if is_community:
                     meta_id = sub("^M_", f"M_{species}_",meta_id)
                 listOfReactants.append([meta_id, meta.attrib.get('stoichiometry'), meta_name])
-                
+
                 # Create a list of only of meta to determine if a reaction will be transport reaction
                 # both list must be the same (same element in reactnats and products)
-                listOfReactantsNames.append(meta_name.rsplit('_', 1)[0])
+                listOfReactantsNames.append(metabolite_root_id(meta_name))
             break
     return listOfReactants, listOfReactantsNames
 
@@ -138,7 +149,7 @@ def get_listOfProducts(reaction:ET.Element, species:str=None, is_community:bool=
 
                 # Create a list of only of meta to determine if a reaction will be transport reaction
                 # both list must be the same (same element in reactnats and products)
-                listOfProductsNames.append(meta_name.rsplit('_', 1)[0])
+                listOfProductsNames.append(metabolite_root_id(meta_name))
             break
     return listOfProducts, listOfProductsNames
 

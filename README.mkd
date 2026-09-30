@@ -1,4 +1,30 @@
-# Seed2LP 
+# Seed2LP
+
+## Quickstart
+
+```
+pip install seed2lp
+seed2lp target <network.sbml> <output_dir>/
+```
+
+By default this runs the `subsetmin` optimisation (all subset-minimal seed sets) with the `reasoning` solving submode only - see [Set mode](#set-mode) for the other choices (`-m`/`--mode`: `minimize`, `all` ; `-so`/`--solve`: `filter`, `guess_check`, `guess_check_div`, `hybrid`, `all`). At the end of the run, the path of every file written is printed to the console (`Output file written: ...`).
+
+### Choosing where seeds can come from
+
+Three independent options affect how "exchange metabolites" (the metabolites importable/exportable at the network boundary) can become seeds. They are easy to confuse, so pick the one matching your intent:
+
+|                 you want to...                        |              use              | what actually happens |
+|:-------------------------------------------------------|:------------------------------|:-----------------------|
+| Let the solver decide everything, don't bias the search | *(default, no flag)*          | import/export reactions are **removed** before conversion to ASP; boundary metabolites become ordinary dead-end metabolites, free to be picked as seeds only if the solver actually needs them |
+| Let the solver decide, but keep the network's stoichiometry intact (matters for Hybrid/FBA flux checks) | `-kir` / `--keep-import-reactions` | import/export reactions are **kept** in the model; boundary metabolites are still a free choice for the solver, nothing is forced |
+| Trust the SBML's boundary reactions directly, skip the solver's choice | `-kir -ti` (`--keep-import-reactions --topological-injection`) | import/export reactions are kept **and** every exchanged metabolite is **forced** into the seed set |
+| You already know your seeds | `-sf` / `--seeds-file <file>` | the given metabolites are added to the seed set directly - independent of the three choices above, can be combined with any of them |
+
+> ⚠️ `-ti`/`--topological-injection` has **no effect on its own** - it only does something when combined with `-kir`/`--keep-import-reactions`. Used alone, import reactions are still removed and `-ti` is silently ignored.
+
+See the full option reference [here](#main-📜-options-for-search-mode-features) for every other option (targets, objective, accumulation, flux checks, clingo tuning, ...).
+
+<hr style="border: 4px outset" size="8" >
 
 ## Introduction
 Seed2LP is a formal framework for metabolic seed inference, based on logical and combinatorial modelling of metabolic networks, and extended to a hybrid approach combining logical reasoning and flow analysis. The objective is to identify the minimal sets of metabolites necessary for the functional activation of a metabolic network, while integrating constraints from stoichiometry and flow feasibility.
@@ -137,9 +163,14 @@ For below requirements, installing Seed2LP will install all needed packages if n
 ## Command examples
 The following examples uses a toy described on Seed2LP paper.
 
-> Get all solutions in all Target modes (Reasoning, Filter, Guess&Check, Guess&Check with Diversity, Hybrid lpx), in all optimisations (subset minimal and minimize)
+> Get one solution in Target mode, reasoning submode, subset minimal optimisation (the default - see [Quickstart](#quickstart))
 >```
->seed2lp target networks/toys/SBML/toy_paper.SBML results/toys/
+>seed2lp target networks/toys/SBML/toy_paper.SBML results/toys/ -nbs 1
+>```
+
+> Get all solutions in all Target submodes (Reasoning, Filter, Guess&Check, Guess&Check with Diversity, Hybrid lpx), in all optimisations (subset minimal and minimize)
+>```
+>seed2lp target networks/toys/SBML/toy_paper.SBML results/toys/ -so all -m all
 >```
 
 > Get one solution in Full Network in reasoning and check flux

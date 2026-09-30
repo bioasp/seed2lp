@@ -78,6 +78,8 @@ A reaction is set a "Transport" when:
 - Only one metabolite is involved into the reaction as reactant and product
 - The root of the ID is the same (M_A_e and M_A_c)
 
+The root of the ID is computed by stripping the trailing compartment tag, supporting both naming conventions found in SBML files: a BiGG-style underscore suffix (`M_A_e` / `M_A_c`) and a ModelSEED/AGORA-style bracket suffix (`M_A[e]` / `M_A[c]`, encoded by SBML as `M_A__91__e__93__` / `M_A__91__c__93__`).
+
 The reactant is a classic metabolite and the product will be set as "transport". If several transport reactions follow one another, only the first reactant is set as classic metabolite, all other are set as transported.
 
 This specification allows the logic programming to reduce the combinatorial in order to have more different solutions.
@@ -93,6 +95,17 @@ This specification allows the logic programming to reduce the combinatorial in o
 >
 > When the metabolite $A\_c$, $A\_m$ and $B\_c$ are set as transported, they are exclude as seeds and the the new set of solutions becomes:
 > $$ S = \{A\_e,  B\_e\} $$
+
+#### Lifting the "transport" tag when no exchange is reachable
+
+A metabolite still tagged "transport" can never be selected as a seed. If every path leading to a metabolite only goes through transport reactions (no exchange reaction reachable), the whole set of solutions could become infeasible. Seed2LP lifts the tag back to "other" (making the metabolite seed-eligible again) in two cases:
+
+- **Single dead-end**: a metabolite involved in only one reaction, itself a transport reaction, whose other side is also tagged "transport" - it has nowhere else to be reached from.
+  > 📃 **Example:**
+  > $$ C\_m ⟷ C\_c \quad | \quad C\_g ⟷ C\_c \quad | \quad C\_e ⟷ C\_g \quad | \quad C\_m + A ⟷ B $$
+  > $C\_e$ is involved in only one reaction (with $C\_g$, itself tagged "transport"), and no exchange reaction reaches it: $C\_e$ is lifted to "other".
+
+- **Whole compartment group stuck**: none of the metabolites is a single-reaction dead-end (each is involved in several reactions), but every compartment variant of the same metabolite (same root ID, see above) is still tagged "transport", with no exchange escaping the group. The variant with the fewest reaction occurrences (closest to a dead-end) is lifted to "other" - an arbitrary but deterministic choice, made only to keep the search satisfiable, not a claim that this particular variant is the "real" biological entry point.
 
 
 ### Objective Reaction

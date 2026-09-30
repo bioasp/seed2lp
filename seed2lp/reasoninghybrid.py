@@ -1,6 +1,7 @@
 from .solver import Solver
 from .network import Network
 from multiprocessing import Process, Queue
+from queue import Empty
 from .file import save, delete, write_instance_file, load_tsv, existing_file
 import clingo
 from . import color
@@ -8,7 +9,8 @@ from .logger import init_logger, print_log
 from os import path
 import random
 from time import time
-from json import loads
+from json import loads, dumps
+from .utils import build_solution_dict
 
 ###################################################################
 ############# Class HybridReasoning : herit Solver ################ 
@@ -288,17 +290,18 @@ class HybridReasoning(Solver):
             dict, list: solution_list, solution_temp
         """
         solution_temp=None
-        
+
         seeds=list(sorted(seeds))
-        solution = ["size", size] + ["Set of seeds", seeds] 
-        if self.network.is_community:
-            solution += ["Set of transferred", trans_solution_list] 
+        transferred = trans_solution_list if self.network.is_community else None
+        solution = build_solution_dict(size, seeds, cobra_flux=cobra_flux, transferred=transferred)
         # Solutions from filter and guess check
         if cobra_flux or \
             (self.network.is_community and self.community_mode!="global"):
-            if cobra_flux:
-                solution += ["Cobra flux", cobra_flux]
-            solution_temp = [solution_name, size, seeds, number_rejected, cobra_flux]
+            # Written to the temporary tsv file as a JSON string (with numpy scalars cast to
+            # native float) instead of the raw dict, so it can be read back with json.loads
+            # instead of the previous fragile str()/repr + quote-replace hack.
+            cobra_flux_json = dumps({k: float(v) for k, v in cobra_flux.items()}) if cobra_flux else None
+            solution_temp = [solution_name, size, seeds, number_rejected, cobra_flux_json]
             if self.network.is_community:
                 solution_temp.append(trans_solution_list)
         solution_list[solution_name]=solution
@@ -367,36 +370,79 @@ class HybridReasoning(Solver):
             if not is_one_model:
                 try:
                     temp_list = load_tsv(full_path)
-                    for solution in temp_list:
-                        if len(solution) == column_len:
-                            # some line has no data value onlu the number of rejected solution
-                            if solution[0]:
+                except Exception as e:
+                    temp_list = []
+                    print_log(self.logger, f"An error occured while reading temporary file\n {full_path}:\n {e}", 'error', verbose=self.verbose)
+
+                for solution in temp_list:
+                    if len(solution) == column_len:
+                        # some line has no data value onlu the number of rejected solution
+                        if solution[0]:
+                            # Each line is parsed independently: a single malformed/corrupted
+                            # line must not discard the solutions already found on other lines.
+                            try:
                                 seeds = solution[2].replace(" ", "")
                                 seeds = seeds.replace("\'", "")
                                 seeds_list = seeds[1:-1].split(',')
 
-                                sol = ["size", solution[1]] + \
-                                    ["Set of seeds",seeds_list]
+                                transferred_list = None
                                 if self.network.is_community:
-                                    transferred_list = eval(solution[5]) 
-                                    sol += ["Set of transferred", transferred_list]
+                                    transferred_list = eval(solution[5])
 
-                                cobra_dict = loads(solution[4].replace("'",'"'))
-                                sol += ["Cobra flux",  cobra_dict]
+                                cobra_dict = loads(solution[4])
+                                sol = build_solution_dict(int(solution[1]), seeds_list,
+                                                           cobra_flux=cobra_dict, transferred=transferred_list)
                                 solution_list[solution[0]] = sol
-                            #get the last occurence pf rejected solutions number
-                            number_rejected = solution[3]
-                    print_log(self.logger, f'Rejected solution during process: at least {number_rejected} \n', 'info', verbose=self.verbose)
-                except Exception as e:
-                    print_log(self.logger, f"An error occured while reading temporary file\n {full_path}:\n {e}", 'error', verbose=self.verbose)
+                            except Exception as e:
+                                print_log(self.logger, f"Skipping corrupted solution line in temporary file\n {full_path}:\n {e}", 'error', verbose=self.verbose)
+                        #get the last occurence pf rejected solutions number
+                        number_rejected = solution[3]
+                print_log(self.logger, f'Rejected solution during process: at least {number_rejected} \n', 'info', verbose=self.verbose)
 
                 if any(solution_list):
                     for name in solution_list:
-                        seeds = solution_list[name][3]
+                        seeds = solution_list[name]["Set of seeds"]
                         self.network.add_result_seeds('REASONING '+suffix, search_mode, name, len(seeds), seeds, transferred_list=transferred_list)
                 delete(full_path)
         return solution_list, number_rejected
     
+
+
+    def wait_for_subprocess(self, queue:Queue, p:Process, poll_interval:float=1.0):
+        """Wait for a result put on the queue by a solver subprocess, without ever
+        hanging indefinitely on a subprocess that already crashed.
+
+        A single blocking queue.get(timeout=self.time_limit) cannot tell a subprocess
+        that is still legitimately working apart from one that died early without ever
+        calling queue.put(): both only surface as Empty once the full time budget has
+        elapsed. Worse, when no time limit is set (self.time_limit is None, the CLI
+        default with -tl 0), such a blocking call never raises at all, so a crashed
+        subprocess would hang the whole program forever. Polling in short intervals
+        and checking p.is_alive() on each Empty fixes both: a crash is detected within
+        one poll_interval regardless of whether a time limit is set.
+
+        Args:
+            queue (Queue): Queue the subprocess is expected to put its result on.
+            p (Process): The subprocess to wait for.
+            poll_interval (float, optional): How often (seconds) to check the
+                subprocess is still alive while waiting. Defaults to 1.0.
+
+        Returns:
+            tuple, bool: the item put on the queue (None if none arrived), and whether
+                the wait ended because the time limit was reached while the subprocess
+                was still alive (True) as opposed to the subprocess having died early
+                (False, only meaningful when the first element is None).
+        """
+        deadline = (time() + self.time_limit) if self.time_limit else None
+        while True:
+            remaining = poll_interval if deadline is None else min(poll_interval, deadline - time())
+            if remaining <= 0:
+                return None, True
+            try:
+                return queue.get(timeout=remaining), False
+            except Empty:
+                if not p.is_alive():
+                    return None, False
 
 
     def solve_hybrid(self, step:str, full_option:list, asp_files:list, search_mode:str, is_one_model:bool):
@@ -430,42 +476,59 @@ class HybridReasoning(Solver):
             p = Process(target=self.guess_check, args=(queue, full_option, asp_files, search_mode, full_path, is_one_model))
         
         p.start()
+        process_failed = False
         try:
-            # the time out limit is added here
-            obj, solution_list, time_ground, time_solve, number_rejected = queue.get(timeout=self.time_limit)
-            #solution_list, number_rejected = self.get_solution_from_temp(unsat, is_one_model, full_path, suffix, search_mode)
-            
-            # Because of the process, the object is not change (encapsulated and isolated)
-            # it is needed to give get the output object and modify the current object
-            if "minimize" in search_mode:
-                self.optimum_found = obj.optimum_found
-                self.optimum = obj.optimum
-                self.get_separate_optimum()
-            self.network.result_seeds = obj.network.result_seeds 
-            if not is_one_model:
-                delete(full_path)
-        except:
-            time_process=time() - start
-            time_ground = time_solve = -1
-            unsat = False
-            time_out = False
-            if not self.time_limit or time_process < self.time_limit:
-                unsat = True
-            else:
-                time_out = True
-            if time_out:
-                print_log(self.logger, f'Time out: {self.time_limit_minute} min expired', "error", self.verbose)
-            
-            solution_list, number_rejected = self.get_solution_from_temp(unsat, is_one_model, full_path, suffix, search_mode)
-        p.terminate()
-        queue.close()
+            try:
+                # the time out limit is added here (polling: see wait_for_subprocess())
+                result, timed_out = self.wait_for_subprocess(queue, p)
+                if result is not None:
+                    obj, solution_list, time_ground, time_solve, number_rejected = result
+
+                    # Because of the process, the object is not change (encapsulated and isolated)
+                    # it is needed to give get the output object and modify the current object
+                    if "minimize" in search_mode:
+                        self.optimum_found = obj.optimum_found
+                        self.optimum = obj.optimum
+                        self.get_separate_optimum()
+                    self.network.result_seeds = obj.network.result_seeds
+                    if not is_one_model:
+                        delete(full_path)
+                elif timed_out:
+                    # The subprocess was still alive when the time budget ran out: a
+                    # genuine time out (a genuine unsatisfiable search still reaches
+                    # queue.put() normally, so it never lands here - see the
+                    # "if not any(solution_list)" below).
+                    time_ground = time_solve = -1
+                    print_log(self.logger, f'Time out: {self.time_limit_minute} min expired', "error", verbose=self.verbose)
+                    solution_list, number_rejected = self.get_solution_from_temp(False, is_one_model, full_path, suffix, search_mode)
+                else:
+                    # The subprocess died (crash, I/O error, malformed input...) before
+                    # ever reaching queue.put(): a failure, not an unsatisfiable problem.
+                    process_failed = True
+                    time_ground = time_solve = -1
+                    p.join(timeout=1)
+                    print_log(self.logger, f'Solver process failed unexpectedly (exited with code {p.exitcode}) - check the traceback above for the underlying cause', "error", verbose=self.verbose)
+                    solution_list, number_rejected = self.get_solution_from_temp(False, is_one_model, full_path, suffix, search_mode)
+            except Exception as e:
+                # Anything else: an error in the parent-side bookkeeping around a
+                # successful result (malformed object, delete(full_path) failing...).
+                # Still a failure, not an unsatisfiable problem.
+                process_failed = True
+                time_ground = time_solve = -1
+                print_log(self.logger, f'Solver process failed unexpectedly: {type(e).__name__}: {e}', "error", verbose=self.verbose)
+                if p.exitcode not in (None, 0):
+                    print_log(self.logger, f'Solver process exited with code {p.exitcode} - see traceback above for the underlying cause', "error", verbose=self.verbose)
+                solution_list, number_rejected = self.get_solution_from_temp(False, is_one_model, full_path, suffix, search_mode)
+        finally:
+            p.terminate()
+            queue.close()
 
         if is_one_model:
-            if not self.optimum_found:
-                print_log(self.logger, 'Optimum not found', "error", self.verbose) 
+            if not self.optimum_found and not process_failed:
+                print_log(self.logger, 'Optimum not found', "error", verbose=self.verbose)
         else:
-            if not any(solution_list): 
-                print_log(self.logger, 'Unsatisfiable problem', "error", self.verbose)
+            if not any(solution_list) and not process_failed:
+                print_log(self.logger, 'Unsatisfiable problem', "error", verbose=self.verbose)
 
         return time_solve, time_ground, solution_list, number_rejected
     
@@ -574,10 +637,11 @@ class HybridReasoning(Solver):
                             print_log(self.logger, f'CHECK Solution {size} seeds -> KO\n', 'debug', verbose=self.verbose)
                             number_rejected +=1
                             current_timer = time() - start_time
-                            # write all 100 rejected 
-                            # or write from 5 minute before finishing the process near to finish  the process
+                            # write all 100 rejected
+                            # or write once 90% of the time limit has elapsed, so the threshold
+                            # stays meaningful (not negative/always-true) for short time limits too
                             if number_rejected%100 == 0 \
-                            or (current_timer!=0 and current_timer > self.time_limit_minute*60 - 300):
+                            or (current_timer!=0 and current_timer > self.time_limit_minute*60*0.9):
                                 self.temp_rejected(number_rejected, full_path)
                     # This means we are in "is_one_model", we are searching for minimize
                     # there is no minimize with community mode
@@ -774,10 +838,11 @@ class HybridReasoning(Solver):
                 number_rejected +=1
 
                 current_timer = time() - start_time
-                # write all 100 rejected 
-                # or write from 5 minute before finishing the process near to finish  the process
+                # write all 100 rejected
+                # or write once 90% of the time limit has elapsed, so the threshold
+                # stays meaningful (not negative/always-true) for short time limits too
                 if number_rejected%100 == 0 \
-                or (current_timer!=0 and current_timer > self.time_limit_minute*60 - 300):
+                or (current_timer!=0 and current_timer > self.time_limit_minute*60*0.9):
                     self.temp_rejected(number_rejected, full_path)
 
         # Needed when all solutions are rejected and not 100 solution tested

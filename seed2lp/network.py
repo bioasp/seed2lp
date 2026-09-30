@@ -17,7 +17,7 @@ import os, logging
 import pandas as pd
 from .reaction import Reaction
 import seed2lp.sbml as SBML
-from .utils import quoted, prefix_id_network
+from .utils import quoted, prefix_id_network, decode_sbml_id, metabolite_root_id
 from . import flux
 from .resmod import Resmod
 from time import time
@@ -435,6 +435,9 @@ class NetBase:
                 reaction_origin_name = reaction.name.replace(f"_{species}", "")
             else:
                 reaction_origin_name = reaction.name
+            # decoded only for display: warning_message below is terminal/log output,
+            # the underlying reaction.name (SBML-legal id) is left untouched
+            reaction_origin_name = decode_sbml_id(reaction_origin_name)
 
             # If the reaction can never have flux, meaning lower_bound = 0 and upper_bound = 0
             # The reaction is deleted from the network
@@ -628,7 +631,7 @@ class NetBase:
         review_tag_metabolite() already rescues a metabolite used in a single reaction,
         provided its only transport partner is also "transport". This covers groups of any
         size: metabolites are grouped by their root id (same grouping already used to detect
-        transport reactions in the first place, rsplit('_', 1)[0], so no new naming
+        transport reactions in the first place, metabolite_root_id(), so no new naming
         assumption is introduced). For each group where every known variant of that root id
         is still tagged "transport" (none escaped to "exchange" or "other"), the variant with
         the fewest reaction occurrences is retagged "other" - the same criterion (fewest
@@ -637,12 +640,12 @@ class NetBase:
         """
         transport_by_root = dict()
         for id_meta in self.meta_transport_list:
-            root = id_meta.rsplit('_', 1)[0]
+            root = metabolite_root_id(id_meta)
             transport_by_root.setdefault(root, []).append(id_meta)
 
         all_variants_by_root = dict()
         for id_meta in self.used_meta:
-            root = id_meta.rsplit('_', 1)[0]
+            root = metabolite_root_id(id_meta)
             all_variants_by_root.setdefault(root, set()).add(id_meta)
 
         for root, transport_ids in transport_by_root.items():
@@ -715,7 +718,7 @@ class NetBase:
 
         message = ""
         for target in self.meta_authorized_seed_list:
-            message += (f"\n - {target}: authorized as seed despite being a target."
+            message += (f"\n - {decode_sbml_id(target)}: authorized as seed despite being a target."
                         f"\n     Only reachable through a removed reaction, required by the objective (topological short-circuit).")
         if message:
             self.logger.warning(message)
@@ -745,7 +748,12 @@ class NetBase:
         for forbidden in self.forbidden_seeds:
             facts += f'\nforbidden({quoted(forbidden)}).'
         for possible in self.possible_seeds:
-            facts += f'\np_seed({quoted(possible)}).'
+            # p_seed/2 (composed id, real id): every other producer/consumer of p_seed in
+            # seed-solving.lp uses this arity (e.g. the seed choice rule
+            # "{ new_seed(M): p_seed(M,N), not forbidden(N) }."). Outside of community mode
+            # the composed id and real id are the same string (see sbml.py get_listOfReactants/
+            # get_listOfProducts, meta_id == meta_name unless is_community prefixes it).
+            facts += f'\np_seed({quoted(possible)},{quoted(possible)}).'
 
         self.facts = facts
         self.logger.info("... DONE")
@@ -1122,19 +1130,18 @@ class NetBase:
                         solver_type_transmetted = "REASONING FILTER"
                     
                 if "solutions" in data["RESULTS"][solver_type][search_info]:
-                    for solution in data["RESULTS"][solver_type][search_info]["solutions"]:
-                        name = solution
-                        size = data["RESULTS"][solver_type][search_info]["solutions"][solution][1]
-                        seeds_list = data["RESULTS"][solver_type][search_info]["solutions"][solution][3]
+                    for name, solution in data["RESULTS"][solver_type][search_info]["solutions"].items():
+                        size = solution["size"]
+                        seeds_list = solution["Set of seeds"]
                         obj_flux_lp = dict()
                         if solver_type == "FBA" or solver_type == "HYBRID":
-                            for flux in data["RESULTS"][solver_type][search_info]["solutions"][solution][5]:
+                            for flux in solution.get("reaction_flux", []):
                                 reaction = flux[0]
                                 if reaction in self.objectives_reaction_name:
                                     obj_flux_lp[reaction] = flux[1]
                         if self.is_community:
-                            transferred_list = data["RESULTS"][solver_type][search_info]["solutions"][solution][5]
-                        else: 
+                            transferred_list = solution.get("Set of transferred")
+                        else:
                             transferred_list = None
                         self.add_result_seeds(solver_type_transmetted, search_info, name, size, seeds_list,
                                               obj_flux_lp, transferred_list=transferred_list)
